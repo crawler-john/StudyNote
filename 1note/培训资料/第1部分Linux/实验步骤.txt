@@ -1,0 +1,78 @@
+chmod和adduser实验
+1、adduser tom 			：添加tom用户
+2、touch aaa   			：新建文本文件aaa，例如在/home/student
+3、sudo chmod 640 aaa 	：将aaa文件的权限修改为其他用户没有任何权限
+4、切换至tom用户
+5、cat aaa				：提示没有权限 cd /home/student
+6、切换回当前用户
+7、sudo chmod 646 aaa	：将aaa文件的权限修改为其他用户可以读写
+8、cat aaa和gedit aaa	：可以读也可以写
+
+网络实验
+1、在虚拟机中将网卡设为NAT工作模式
+2、检查windows服务“VMware NAT Service”和“VMware DHCP Service”是否已经启动
+3、检查虚拟网卡“VMware Network Adapter VMnet8”是否工作正常
+4、在windows中查看网卡信息：ipconfig
+5、在linux中查看网卡信息：ifconfig
+6、在windows中ping:	ping 192.168.96.134
+7、在linux中ping：	ping 192.168.96.1
+
+编辑器（editor）和编译器（compiler）有什么区别
+登陆（landing）和登录（login）有什么区别
+linux称呼
+C#
+.NET 
+
+vi实验
+1、打开和退出vim
+2、行内跳转到行首、行尾
+3、文件内跳转到第一行、最后行、指定行
+4、进入编辑模式的5种方法
+5、删除的3种方法
+6、复制整行、粘贴整行的方法
+
+vimtutor:按照指示和步骤操作3遍以上
+
+bash环境演练
+1、命令行编辑中ctrl+u和ctrl+k的用法
+2、命令和目录、文件名中tab键自动补全功能的使用
+3、按上方向键出现命令历史功能
+4、执行指定编号的历史命令：	！100
+5、查看命令记录文件：	~/.bash_history
+6、清空命令历史：	history -c
+7、查看bash中的常用别名ll la l： cat ~/.bashrc
+
+服务端NFS环境配置
+1、确认安装nfs服务端(portmap和nfs-kernel-server)
+2、创建一个服务端共享目录并修改权限
+	sudo mkdir /opt/share
+	sudo chmod 777 /opt/share
+3、修改nfs配置文件，加入共享目录： 
+	sudo vi /etc/exports
+	增加：/opt/share *(rw)		:此行前面不要加注释#
+4、如果服务端服务未启动，启动之
+	sudo service portmap start	(status参数用于查看状态)
+    sudo service nfs-kernel-server start (status参数用于查看状态)
+5、如果服务端服务已启动，强迫配置生效：
+   sudo exportfs -rf
+客户端NFS环境配置
+1、确认安装nfs客户端(nfs-common)
+2、ping通服务器
+3、创建一个用于共享的目录
+   sudo mkdir /mnt/share
+4、查看指定服务端的共享信息
+	showmount -e 127.0.0.1	例如：/opt/share *
+5、绑定服务端目录至本地
+	sudo mount -t nfs 127.0.0.1:/opt/share /mnt/share
+
+Linux通过samba访问windows（windows 7系统可能有安全问题）
+1、在Linux中ping通windows的ip地址（通过ipconfig查看vmnet8）,例如为192.168.96.1
+2、在Linux创建一个目录用于绑定：	sudo /mnt/share
+3、在windows中创建一个名为share的共享文件夹
+4、运行绑定
+sudo mount -o username=administrator //192.168.96.1/share /mnt/share
+
+在windows中访问Linux
+1、在linux文件管理器中启用共享
+2、windows中ping通linux主机的ip地址
+3、在“运行”中输入"\\192.168.96.135"即可访问linux

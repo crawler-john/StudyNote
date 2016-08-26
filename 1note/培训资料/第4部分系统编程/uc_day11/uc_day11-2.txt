@@ -1,0 +1,65 @@
+关于函数的返回值
+1.返回局部变量,但不能返回局部变量的地址
+2.static局部变量的地址可以返回
+3.数组理论上可以做返回值，但是不能写成数组，应该写成指针
+
+int[] get();//错误
+
+
+线程的状态：
+线程应该处于以下两种状态
+1.分离状态
+就是线程一旦结束，不用管其他线程，直接回收资源，函数pthread_detach()可以设置线程为分离状态
+
+2.join状态
+如果线程用pthread_join()，就处于join状态,就是线程结束时暂不回收资源，到pthread_join()函数结束时再回收资源
+
+注：没有分离也没有join的线程资源回收是没有保障的
+分离状态的线程再调用pthread_join()没有效果
+
+
+线程的退出：
+正常退出：
+在线程函数中执行return语句
+执行了pthread_exit(void *)函数
+非正常退出：
+自身出现错误
+被其他线程终止/取消
+
+exit()和pthread_exit(void *)的区别
+exit()结束进程,所有线程全部救赎
+pthread_exit(void *)结束线程,其他线程继续运行
+参数void *和return一样，都是用于返回值
+
+取消线程的函数：pthread_cancel()
+
+二.线程同步
+多线程之间是共享进程资源,因此有可能出现共享数据的冲突，解决方案就是把并行的访问编程串行的访问，这种技术就叫线程同步，线程同步的技术包括：互斥量,信号量，条件变量
+
+互斥量也叫互斥锁，是线程设计时官方的同步技术,编程步骤如下：
+1.声明互斥锁
+pthread_mutex_t lock;//变量名不一定叫lock
+2.初始化互斥锁
+pthread_mutex_init(&lock);
+也可以在声明时赋值
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER
+3.加锁/上锁
+pthread_mutex_lock(&lock);
+4.执行共享区数据的访问
+5.解锁
+pthread_mutext_unlock(&lock);
+6.释放锁的资源
+pthread_mutex_destory(&lock);
+
+
+
+
+
+
+
+
+
+
+
+
+

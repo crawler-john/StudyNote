@@ -1,0 +1,61 @@
+UDP编程：
+TCP和UDP的区别主要是socket()的第二个参数，如果是SOCK_STREAM就是TCP，如果是SOCK_DGRAM就是UDP
+UDP也分发送和接收方
+UDP发送数据几乎不用write，而使用sendto();
+接收数据可以使用2个函数：read()/recvfrom();
+区别在于read函数无法得知数据的来源，而recvfrom()可以获取数据发送者的信息
+
+ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
+                const struct sockaddr *dest_addr, socklen_t addrlen);
+参数：前三个参数和write一样，flags给0即可，dest_addr就是第二步的通信地址的指针，addrlen就是通信地址的长度
+
+返回值：成功返回成功发送的字节数，失败返回-1
+注：sendto()像write()和connect()的合体
+
+ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
+                    struct sockaddr *src_addr, socklen_t *addrlen);
+参数：前三个参数和read一样，flags给0即可，src_addr用于存储发送者的通信地址的指针，addrlen是一个传入传出参数，把src_addr的sizeof传入，再传出真正获取到的通信地址的大小,(后两个参数和accept一样)
+
+返回值：成功返回接收到的字节数，失败返回-1
+注：recvform()像read()和accept()的合体
+
+
+练习：写一个基于UDP的反复通信，当客户端发送请求时，发回当前系统时间，服务器写成死循环，用信号退出
+
+提示:time()获得秒差，使用localtime()负责把秒差转换成年月日时分秒的格式，返回给客户端，localtime()返回时间结构体的指针 struct tm *，具体成员在手册localtime条目中
+
+
+聊天室项目：
+
+介绍：
+每个人将消息发给服务器，由服务器接收到的消息发给其他人
+聊天可以采用TCP方式，传文件使用UDP方式
+
+客户端可以接受和发送消息，采用多线程
+一个线程负责接收消息，一个线程负责发送消息
+
+服务器采用多线程去同时处理多个客户端的数据
+每响应一个客户端的请求之后，就开辟一个新的线程，主线程始终保持监听
+线程功能：接收消息，转发给其他客户端
+定义一个数组，保存所有的客户端的描述符，客户端退出酒吧对应的值改为0
+
+如何判断客户端的退出
+read（）recvfrom（）返回0
+客户端发送退出消息
+
+扩展：
+如何实现发送文件的功能
+发送文件名过去，每次读取一块数据，然后发送数据给服务器，服务器根据文件名创建文件，然后把接收到的数据写到文件中
+
+多线程
+listen();
+for(;;)
+{
+	int s = accept();
+	.....
+	pthread_create(&id,NULL,线程函数,线程函数的参数)
+	//参数里一定要带有accept返回的描述符(还可以传递ip)
+}
+
+
+

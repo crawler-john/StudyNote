@@ -1,0 +1,46 @@
+编译的链接文件的写法，链接文件是.lds的后缀
+
+系统时钟：(时钟树)
+查看CPU的芯片手册中关于时钟配置的内容(时钟控制器)
+
+首先硬件提供了一个初始的时钟，FIN（24MHz）
+先使用锁相环技术把FIN提升到一个比较高的频率
+多路选择器：可以从多个源时钟中选择一个合适的作为自己的源时钟
+分频器：可以把一个较高的频率几分频分成较低的频率
+
+?  freq(ARMCLK)  = 1000 MHz
+?  freq(HCLK_MSYS)  = 200 MHz
+?  freq(HCLK_IMEM)  = 100 MHz
+?  freq(PCLK_MSYS)  = 100 MHz
+?  freq(HCLK_DSYS)  = 166 MHz
+?  freq(PCLK_DSYS)  = 83 MHz
+?  freq(HCLK_PSYS)  = 133 MHz
+?  freq(PCLK_PSYS)  = 66 MHz
+?  freq(SCLK_ONENAND)  = 133 MHz, 166 MHz
+
+24  1000.0000 APLL  
+24  667.0000 MPLL
+
+PLL升频器把频率提升上来到稳定需要一定的时间(lock time)
+APLL_LOCK 		0xE010_0000
+MPLL_LOCK 		0xE010_0008
+APLL_LOCK = 0x2d0	0xffff
+MPLL_LOCK = 0x12c0	0xffff
+
+升频升到多大的频率
+APLL_CON0
+= 1 | 3<<8 | 0x7d<<16 | 1<<31
+MPLL_CON0
+= 1 | 0xc<<8 | 0x29b<<16 | 1<<31
+
+多路选择器的选择
+CLK_SRC0		0xE010_0200
+0x10001111
+
+分频器分频
+CLK_DIV0		0xE010_0300
+= 0x14131440
+
+
+
+

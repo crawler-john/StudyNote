@@ -1,0 +1,92 @@
+2.1 硬件环境构建
+    2.1.1 主机和目标板结合的交叉编译环境
+	进行嵌入式Linux开发时，一般可以分为以下三3个步骤：
+	(1)在主机编译bootloader，然后通过JTAG烧乳单板。
+	    JTAG效率很低，适合于烧写空开发板。为方便开发，通常选用具有串口传输、烧写Flash功能的Bootloader，他可以快速从主机获取代码。
+	(2)在主机上编译嵌入式内核，通过bootloader少如单板或直接启动。
+	(3)在主机上编译相应的应用程序，单板启动内核后通过NFS运行它们，经过验证后烧入单板
+		--------------------------------------------
+	        |	 |		      |		|
+		|编辑程序|     JTAG	      |		|
+		|	 |------------------->|		|
+		|	 |烧写（第一个）程序  |	  运行	|
+		|	 |		      |		|
+		|	 |	串口	      |		|
+		|	 |<------------------>|		|
+		|编译程序|操作bootloader/Linux|		|
+		|	 |	网络传输      |	  程序	|
+		|	 |<------------------>|		|
+		|	 |		      |		|
+		|	 |其他连接方式	      |		|
+		|	 |<------------------>|		|
+		|	 |		      |		|
+		---------------------------------------------
+	注意：JTAG接口一般用来调试程序。
+2.2软件环境搭建
+    2.2.1 VMWare的安装与Linux的安装
+    2.2.2 主机Linux操作系统上网络服务的配置和启动
+	配置Linux，启动FTP SSH NFS这三个服务。
+	(1) 设置网络
+	    <1> 设置客户操作系统Linux的IP地址。
+	    <2> 使用网桥网络时，设置主机操作系统windows和VMWare。
+	    <3> 使用NAT网络时，设置VMWare
+	(2) 安装、配置、启动FTP、SSH、NFS服务
+	    <1> apt-get的使用
+		1、修改/etc/apt/sources.list,将其中的注释掉的网址打开
+		2、更新可用的程序列表
+		    sudo apt-get update
+	    <2>安装、配置、启动服务
+		1、安装、配置、启动FTP服务
+		    sudo apt-get install vsftpd
+		    修改vsftpd的配置文件/etc/vsftpd.config，下面几行前面的#去掉
+			#local_enable=YES	(允许本地用户登录)
+			#write_enable=YES	(是否允许上传文件)
+		    修改完后，执行以下命令重启FTP服务：
+			sudo /etc/init.d/vsftpd restart
+		2、安装、配置、启动SSH服务
+		    sudo apt-get install openssh-server
+		    它的配置文件为/etc/ssh/sshd_config,使用默认配置即可
+		3、安装、配置、启动NFS服务
+		    sudo apt-get intall nfs-kernel-server portmap
+		    它的配置文件为/etc/exports,在里面增加以下内容，以将通过网络文件系统访问/work/nfs_root目录。
+		    /work/nfs_root    *(rw,sync,no_root_squash)
+		    执行以下命令重启NFS服务：
+			sudo /etc/init.d/nfs-kernel-server restart
+    2.2.3 在主机Linux操作系统中安装基本的开发环境
+	安装基本的开发环境
+	    sudo apt-get install build-essential (作用是提供编译程序必须软件包的列表信息)
+	安装bison flex（语法 语法分析器）
+	    sudo apt-get install bison flex
+	安装C函数库的man手册
+	    sudo apt-get install manpages-dev
+    2.2.4 安装交叉编译工具
+	(1)使用制作好的工具链
+	    tar xjf arm-linux-gcc-3.4.5-glibc-2.3.6.tar.bz2
+	    然后在环境变量PATH中添加路径如下所示
+		$export PATH=$PATH:/work/tools/gcc-3.4.5-glibc-2.3.6/bin
+	    为了不要每次使用时都手工设置PATH，可以再/etc/environment中修改PATH的值：
+		PATH="......:/work/tools/gcc-3.4.5-glibc-2.3.6/bin"
+	    安装ncurses，ncurses是一个能够提供功能键定义（快捷键）、屏幕绘制以及基于文本终端的图形互动功能的动态库。如果没有它，在执行“make menuconfig”命令配置程序时会出错。
+	    使用下列命令安装
+	      	tar xzf ncurses.tar.gz
+		cd ncurses-5.6
+		./configure --with-shared --prefix=/usr
+		make
+		make install
+	(2)自己制作工具链
+	    如果要基于gcc和glibc来制作编译工作链，可以使用crosstool来进行编译；
+	    如果要基于gcc和uClibc来制作工具链，可以使用buildroot来进行编译。
+	    如果不借助这些工具编译的过程是非常繁琐的。
+	    uClibc比glibc小，在已有的接口上是兼容的，更适用于嵌入式系统。但是uClibc并没有包括glibc中所有的接口实现，因此有些应用可能在uClibc中不能编译。
+	    
+	    crosstool官方网站为http://kegel.com/crosstool/，可以参考其中crosstool-how to.html选择、编译、配置工具链
+	    	<1>修改crosstool脚本
+		    1、修改demo-arm-softfloat.sh
+		    2、修改arm-softfloat.dat
+		    3、修改all.sh
+	    	<2>编译安装工具链
+		    cd crosstool-0.43/ 
+		    ./demo-arm-softfloat.sh
+
+
+

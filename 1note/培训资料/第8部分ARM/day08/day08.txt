@@ -1,0 +1,393 @@
+linux系统移植
+1.裸机开发
+没有操作系统的支持，没有任何库的支持，包括硬件驱动和上层应用都需要自己实现。对于相对简单的系统，开发比较容易，但是如果要实现一些复杂的程序，使用裸机开发的难度很大。
+2.操作系统
+操作系统上有很多的资源，提供了大量的系统调用，可以使用库，开发者可以使用系统提供的函数，包括已经实现好的硬件驱动。大大降低了开发难度
+
+如何在硬件开发平台上装上操作系统
+
+PC：
+1.准备操作系统的安装文件
+2.引导程序(BIOS)
+	系统自带，只需要做对应的配置，无需关心其实现
+3.windows操作系统
+	内核
+	文件系统
+4.驱动程序
+5.应用程序
+
+
+ARM开发板：
+1.准备安装程序
+我们应该去一些指定的官方网站下载标准版本的源代码
+引导程序的源代码
+操作系统内核的源代码(www.kernel.org)
+制作文件系统工具的源代码
+由于嵌入式硬件平台的差异性(非标准化)，导致这些源代码不能再我们的开发板上直接使用，而是需要经过移植(修改)的过程
+
+
+PC		硬件标准化		软件标准化
+嵌入式		硬件有差异		没有固定能用的软件
+
+根据启动的先后顺序(nand flash上的保存路径)
+1.引导程序
+2.操作系统内核
+3.文件系统
+
+移植课程需要做的事
+1.移植代码(准备安装程序)
+	将公版的代码进行修改，使其能在开发板上运行
+	-----掌握移植的方法和原理
+2.部署代码
+	把移植好的代码生成可执行文件，然后再烧写到nand flash上
+	-----熟练掌握
+
+
+一.引导程序
+bootloader  
+boot + loader
+操作系统运行之前运行的代码，它的最终目的就是启动内核
+1）boot
+	初始化硬件设备，建立内存空间映射图，将系统的软硬件环境带到一个合适的状态
+2)loader
+	将操作系统的内核镜像加载到内存，之后跳转到对应的地址运行
+
+二.操作系统内核(linux内核)
+www.kernel.org
+linux-4.2-rc7
+linux-4.1.6
+linux-2.6.35.7
+
+linux内核的本质
+1)C语言函数的集合
+2)内核是硬件的管理者
+3)内核是服务的提供者
+
+内核的功能：
+1.系统调用：实现应用程序和内核的交互
+2.进程管理:进程创建，终止，通信，调度
+3.内存管理（MMU）
+4.设备管理：硬件的驱动
+5.虚拟文件系统
+6.平台相关的代码
+7.网络协议
+
+三.文件系统
+包括根文件系统和建立于flash上的文件系统，包含了linux系统运行必须的应用程序，库等，启动文件系统中的init进程
+
+
+u-boot
+是bootloader的一种
+u-boot有很好的通用性
+1.支持多种架构的CPU：ARM  MIPS  PowerPC等等
+2.支持多种操作系统:linux Vxworks QNX等等
+
+将u-boot的源代码拷贝到虚拟机，解压
+分析u-boot的源代码
+1.cpu
+	包含了和CPU架构相关的代码，u-boot支持的CPU在该目录下有对应的子目录
+
+2.board
+	包含了和开发板相关的代码，每一个开发板都有一个目录与之对应
+
+3.drivers
+	各类具体设备的驱动,基本上通用
+
+4.lib_arm
+	支持ARM架构下的通用代码
+
+5.include/configs/XXX.h
+	定义了大量的宏定义，用于配置u-boot的各项参数
+
+
+u-boot烧写到了nand flash的0地址
+链接脚本  *.lds
+
+
+Makefile:
+1.确定编译器
+	ARCH = arm
+	CROSS_COMPILE = arm-linux-
+2.确定编译哪些文件
+	OBJS	LIBS
+3.如何编译这些文件
+	OBJCFLAGS	LDFLAGS
+4.编译文件
+5.链接文件，生成ELF可执行文件
+
+总结Makefile:
+1.首先确定交叉编译工具的前缀啊arm-linux-
+2.指定OBJS LIBS
+3.生成*.o *.a
+4.将第三步生成*.o,*.a按照u-boot.lds链接脚本进行链接，同时还制定了链接地址0xc3e00000,得到了ELF格式的文件u-boot
+5.将第四步生成的ELF文件通过objcopy命令生成u-boot.bin,同时使用objdump命令生成了反汇编文件u-boot.dis
+
+
+uboot.lds链接文件
+24 OUTPUT_FORMAT("elf32-littlearm", "elf32-littlearm", "elf32-littlearm")
+ 25 /*OUTPUT_FORMAT("elf32-arm", "elf32-arm", "elf32-arm")*/
+//指定了uboot可执行文件的格式，ELF格式，小端格式
+ 26 OUTPUT_ARCH(arm)
+//指定平台为arm
+ 27 ENTRY(_start)
+ 28 SECTIONS
+ 29 {
+ 30     . = 0x00000000;
+//-Ttext=0xc3e00000
+ 31 
+ 32     . = ALIGN(4);
+ 33     .text      :
+ 34     {
+ 35       cpu/s5pc11x/start.o   (.text)
+//指定了第一个被链接的文件,对应的源文件在cpu/s5pc11x/start.S
+//也就是u-boot.bin的入口
+ 56     __u_boot_cmd_start = .;
+ 57     .u_boot_cmd : { *(.u_boot_cmd) }
+ 58     __u_boot_cmd_end = .;
+//自定义段u_boot_cmd，目的是为了在链接时将命令结构体都放到该段中
+//为了便于之后命令的查找和执行
+
+
+u-boot的启动过程
+cpu/s5pc11x/start.S
+
+141 reset:
+149     msr cpsr_c, #0xd3       @ I & F disable, Mode: 0x13 - SVC
+//修改状态寄存器，设置CPU为管理模式，禁止中断和快中断
+288     bl  lowlevel_init   /* go setup pll,mux,memory */
+//定义在board/samsung/smdkc110/lowlevel_init.S
+120     /* init system clock */
+121     bl system_clock_init
+//初始化系统时钟
+123     /* Memory initialize */
+124     bl mem_ctrl_asm_init
+//初始化内存
+127     /* for UART */
+128     bl uart_asm_init
+//初始化串口
+137     /* simple init for NAND */
+138     bl nand_asm_init
+//初始化nandflash
+//进行了必须的底层硬件的初始化,返回
+
+334 nand_boot:
+335     mov r0, #0x1000
+336     bl  copy_from_nand
+337     b   after_copy
+//如果从nand启动,先把uboot的BL2拷贝到DRAM上，然后跳转到DRAM运行
+
+427 copy_from_nand:
+428     push    {lr}        /* save return address */
+429 
+430     mov r9, r0
+431 
+432     mov r9, #0x100      /* Compare about 8KB */
+433     bl  copy_uboot_to_ram
+
+357 after_copy:
+411     ldr pc, _start_armboot
+//跳转到BL2，在DRAM中运行(绝对跳转)
+//通过查看u-boot.dis，_start_armboot的地址c3e001f4
+
+
+start.S
+1.关中断，进入管理模式
+2.在lowlevel_init中进行底层硬件的初始化(时钟，内存，串口，nand)
+3.u-boot的搬移--->0x23e00000
+4.开启MMU 0x23e00000--->0xc3e00000
+5.初始化栈
+6.清BSS段
+7.绝对跳转ldr pc, _start_armboot(c3e001f4)
+从IRAM跳转到外部DRAM中运行(运行在链接地址)
+
+安装source insight
+使用source insight创建工程，将UBOOT的源代码加入到工程中
+
+lib_arm/board.c
+
+typedef int (init_fnc_t) (void);
+//定义了一个返回值为int,参数为void的函数类型
+	for (init_fnc_ptr = init_sequence; *init_fnc_ptr; ++init_fnc_ptr) {
+		if ((*init_fnc_ptr)() != 0) {
+			hang ();
+		}
+	}
+//依次执行函数指针数组中的函数指针
+
+//include/asm-arm/global-data.h
+typedef	struct	global_data {
+	bd_t		*bd;
+	...
+
+} gd_t;
+//u-boot的全局信息结构体
+
+//include/asm-arm/u-boot.h
+typedef struct bd_info {
+    .....
+    ulong	  bi_arch_number;/* unique id for this board */
+    ulong	  bi_boot_params;/* where this board expects params */
+    struct				/* RAM configuration */
+    {
+	ulong start;
+	ulong size;
+    }			bi_dram[CONFIG_NR_DRAM_BANKS];
+
+} bd_t;
+//u-boot的开发板信息结构体
+
+#define DECLARE_GLOBAL_DATA_PTR     register volatile gd_t *gd asm ("r8")
+//将gd变量(地址)放在CPU内部的r8寄存器，gd变量指向的内容还是在内存中
+
+arm-linux-gcc -g  -Os   -fno-strict-aliasing  -fno-common -ffixed-r8 -msoft-float  -D__KERNEL__ -DTEXT_BASE=0xc3e00000 -I/home/student/dyhy1502/sq210_uboot/include -fno-builtin -ffreestanding -nostdinc -isystem /home/student/arm/arm-2009q3/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/include -pipe  -DCONFIG_ARM -D__ARM__ -march=armv5te -mabi=apcs-gnu -mno-thumb-interwork -Wall -Wstrict-prototypes -fno-stack-protector -c -o cmd_mac.o cmd_mac.c
+
+//-ffixed-r8表示在编译时不适用r8寄存器
+
+//board/samsung/smdkc110.c
+int board_init(void)
+{
+	DECLARE_GLOBAL_DATA_PTR;
+#ifdef CONFIG_DRIVER_SMC911X
+	smc9115_pre_init();
+#endif
+
+#ifdef CONFIG_DRIVER_DM9000
+	dm9000_pre_init();//DM9000网卡的初始化
+#endif
+
+	gd->bd->bi_arch_number = MACH_TYPE;
+	//存放的是开发板ID，在启动内核时，会传递给内核
+	gd->bd->bi_boot_params = (PHYS_SDRAM_1+0x100);
+	//uboot传递给内核的参数的地址
+
+	return 0;
+}
+
+int dram_init(void)
+{
+	DECLARE_GLOBAL_DATA_PTR;
+
+	gd->bd->bi_dram[0].start = PHYS_SDRAM_1;//0x20000000
+	gd->bd->bi_dram[0].size = PHYS_SDRAM_1_SIZE;//0x20000000
+
+#if defined(PHYS_SDRAM_2)
+	gd->bd->bi_dram[1].start = PHYS_SDRAM_2;
+	gd->bd->bi_dram[1].size = PHYS_SDRAM_2_SIZE;
+#endif
+
+	return 0;
+}
+//通过for循环，将init_sequence数组中的函数序列一一执行,这些函数进一步初始化硬件信息。
+包括：DM9000，开发板ID，启动参数地址 ...... 内存信息
+main_loop
+
+u-boot两种模式：
+自启动模式：
+下载更新模式：
+bootdelay
+uboot启动时会在bootdelay秒内，检测串口是否有输入，
+1.有，进入下载更新模式(命令行)
+SQ210#
+在该提示符下可以执行键盘输入的命令
+2.没有任何按键输入，进入自启动模式，去启动内核
+如何启动内核？
+uboot会去获取一个环境变量bootcmd,该环境变量中保存了自启动内核的相关命令，接着去执行这些命令，启动内核
+bootcmd=tftp 20008000 zImage;bootm 20008000
+//加载内核镜像zImage到内存地址20008000，到20008000地址去执行内核镜像文//件zImage
+
+uboot命令：
+1.print/printenv：查看当前环境的环境变量
+print bootcmd
+2.set/setenv:设置环境变量
+set bootdelay 5
+set bootcmd tftp 20008000 zImage\;bootm 2000800
+3.save/saveenv:保存环境变量
+4.tftp:通过tftp服务下载对应的文件到内存
+	tftp 20008000 led.bin
+5.go:执行内存地址上的二进制代码
+	go 20008000
+6.bootm:启动内存中的内核镜像文件
+7.nand命令
+nand erase:擦除nand flash
+	nand erase 0 100000
+nand write:写nand flash
+	nand write 20008000 0 100000
+nand read:读nand flash
+	nand read 20008000 60000 50000
+
+uboot代码中的命令是如何定义的
+//include/command.h
+//命令结构体
+struct cmd_tbl_s {
+	char		*name;//命令名字
+	int		maxargs;//最大参数个数
+	int		repeatable;//重复次数				
+	int		(*cmd)(struct cmd_tbl_s *, int, int, char *[]);//对应的命令处理函数
+	char		*usage;//用法信息
+#ifdef	CFG_LONGHELP
+	char		*help;//帮助信息
+#endif
+};
+
+#define Struct_Section  __attribute__ ((unused,section (".u_boot_cmd")))
+__attribute__是GNU C对标准C的扩展，可以用来设置变量的属性，函数的属性，类型的属性
+在上面表示用该属性修饰的变量，在链接时会被放到.u_boot_cmd段中(uboot.lds)
+
+#define U_BOOT_CMD(name,maxargs,rep,cmd,usage,help) \
+cmd_tbl_t __u_boot_cmd_##name Struct_Section = {#name, maxargs, rep, cmd, usage, help}
+
+U_BOOT_CMD(
+	version,	1,		1,	do_version,
+	"version - print monitor version\n",
+	NULL
+);
+
+cmd_tbl_t __u_boot_cmd_version __attribute__ ((unused,section (".u_boot_cmd"))) 
+=
+{version,	1,		1,	do_version,
+	"version - print monitor version\n",
+	NULL};
+
+
+bootm 20008000
+//commom/cmd_bootm.c
+//lib_arm/bootm.c
+do_bootm->do_bootm_linux->theKernel (0, machid, bd->bi_boot_params);
+					板ID    uboot传递给内核的参数						的地址
+
+uboot的启动过程：
+1.start.S->前8K是在CPU内部的IRAM中运行，和位置无关
+2.lowlevel_init.S->关看门狗，初始化时钟，内存，串口，nand flash
+3.start.S->把整个uboot拷贝到外部DRAM内存中，为其运行在0xc3e00000做准备
+开MMU，建栈，清bss段，使用伪指令ldr pc,_start_arm_boot跳转到uboot的BL2
+4.start_armboot->执行了初始化函数列表，board_init,dram_init等等
+5.main_loop->获取bootdelay bootcmd环境变量
+6.执行bootcmd命令中的加载内核镜像命令,tftp 20008000 zImage
+7.bootm命令->do_bootm->do_bootm_linux->theKernel(0,2456,0x20000100)
+						r0,r1,r2
+bootargs环境变量(非常重要)
+
+
+移植过程：
+1.修改Makefile
+ 126 ARCH = arm
+ 127 CROSS_COMPILE = arm-linux-
+
+set bootcmd tftp 20008000 zImage\;bootm 20008000
+
+set bootargs root=/dev/nfs init=/linuxrc nfsroot=192.168.1.141:/home/student/workdir/rootfs ip=192.168.1.20:192.168.1.141:192.168.1.1:255.255.255.0::eth0:on console=ttySAC0,115200
+
+set machid 270f
+
+save
+
+修改nfs配置文件
+sudo vi /etc/exports
+
+ 11 /home/student/workdir/rootfs *(rw,sync,no_root_squash)
+
+sudo /etc/init.d/nfs-kernel-server restart
+
+
+set bootargs root=/dev/nfs init=/linuxrc nfsroot=192.168.1.141:/home/student/study/busybox-1.21.1/_install ip=192.168.1.20:192.168.1.141:192.168.1.1:255.255.255.0::eth0:on console=ttySAC0,115200
+

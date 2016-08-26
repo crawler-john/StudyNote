@@ -1,0 +1,240 @@
+1.等待队列
+实现机制：
+1）等待队列头
+数据类型：wait_queue_head_t
+2)等待队列:存放的是休眠的进程
+数据类型:wait_queue_t
+3)调度器
+内核已经实现
+
+编程方法：
+方法1：
+1.分配等待队列头
+wait_queue_head_t wq;
+2.初始化等待队列头
+init_waitqueue_head(&wq);
+//分配初始化可以一步搞定
+//DECLARE_WAIT_QUEUE_HEAD(wq);
+3.分配初始化等待队列
+wait_queue_t wait;
+init_waitqueue_entry(&wait,current);
+//DECLARE_WAITQUEUE(wait, current);
+current:内核全局变量，用来表示当前进程
+分配初始化wait这个等待队列，同时将当前进程current填充到等待队列这个容器中
+4.调用add_wait_queue将要休眠的进程添加到自己分配初始化号的等待队列头所在的数据链中，当前进程还没有真正休眠
+current->state = TASK_INTERRUPTIBLE;
+5.进入一个死循环for(;;)
+6.判断设备是否可用，如果可用，跳出死循环，不可用，继续执行
+7.如果继续执行，调用signal_pending(current)判断当前进程是否收到信号,收到返回非0，没收到返回0，没有收到信号，继续执行，收到信号，跳出死循环
+8.如果设备不可用，也没有收到信号，那么就进入真正的休眠
+schedule()
+9.进程被唤醒有2个原因
+收到信号
+设备可用
+10.一旦schedule()返回，应该再次判断由哪种原因唤醒，最后跳出死循环
+11.设置当前进程的状态
+current->state = STAK_RUNNING；
+12.将休眠的进程从等待队列头中移除
+
+代码实现：
+1.分配初始化等待队列头
+DECLARE_WAIT_QUEUE_HEAD(wq);
+2.分配初始化等待队列
+DECLARE_WAITQUEUE(wait, current);
+3.将当前进程添加到等待对猎头
+add_wait_queue(&wq,&wait)
+4.
+while(1)
+{
+	current->state = TASK_INTERRUPTIBLE;
+	if(设备数据可用)
+		break;//可用
+	if(signal_pending(current))
+		break;//收到信号
+	schedule();//休眠
+	//进程就在此处开始休眠，等待被唤醒
+	//有信号，或者设备可用被唤醒
+}
+current->state = TASK_RUNNING;
+//将当前进程设置为TASK_RUNNING状态
+remove_wait_queue(&wq,&wait);
+//将当前进程从等待队列头中移除
+
+方法2：
+1.分配初始化等待队列头
+wait_queue_head_t wq;
+init_waitqueue_head(&wq);
+2.等待唤醒
+wait_event_interruptible(queue, condition);
+wait_event
+wait_event_killable
+wait_event_timeout
+wait_event_interruptible_timeout
+
+如何唤醒方法1和方法2中睡眠的进程
+在适当的地方调用wake_up/wake_up_interruptible
+一般所说的适当时候就是在中断处理函数中
+因为中断代表设备有操作
+按键有按键操作，产生中断
+串口接收到数据，产生中断
+
+按键消抖
+抖动产生的时间间隔会小于10ms
+
+linux内核链表：list_head
+内核链表节点没有数据域，只有指针域，
+如何使用？
+把节点放到其他结构体中作为成员来使用
+
+
+platform:平台设备总线驱动模型
+linux内核的分离思想：
+对于我们前面所写的代码，如果硬件连接方式发生了改变，我们这个驱动就一定需要进行修改，移植性比较差
+我们发现需要修改的地方都是很硬件相关的位置，软件相关的代码完全不需要修改，为了解决这种问题，内核提出了软硬件分离的思想
+
+分离思想：就是将软件内容和硬件内容分开
+让驱动更加关注硬件的改动，而不是软件(软件一旦实现几乎不需要修改)
+
+如何实现分离思想：
+平台设备总线驱动模型
+
+内核如何实现总线设备驱动模型
+1.内核帮你实现了一个虚拟总线platform_bus_type,
+在该总线下维护者两个链表:dev链表,drv链表
+dev链表中存放的是硬件相关的信息，
+drv链表中存放的是软件相关的信息
+
+dev链表中每一个节点对应的数据结构：struct platform_device
+drv链表中每一个节点对应的数据结构：struct platform_driver
+这连个数据结构中都有name字段，用于做两者之前的匹配
+
+如何匹配？
+每当向dev链表中添加硬件节点，内核回去遍历drv链表,取出每一个软件节点，通过两者的name字段进行匹配，如果匹配成功，说明硬件节点找到了对应的软件节点，内核就会调用platform_driver中的probe函数，同时将硬件节点的地址作为参数传递给probe函数，probe函数完成什么样的工作，完全有开发者决定
+
+每当向drv链表中添加软件节点，内核回去遍历dev链表,取出每一个硬件节点，通过两者的name字段进行匹配，如果匹配成功，说明软件节点找到了对应的硬件节点，内核就会调用platform_driver中的probe函数，同时将硬件节点的地址作为参数传递给probe函数
+
+所以说对于这种驱动模型来说，只需要关注platform_device和platform_driver
+
+如何使用这两个结构体实现一个完整的驱动？
+platform_device如何使用
+1.分配初始化resource填充硬件相关信息
+struct resource btn_res[] = 
+{
+	[0] = {
+		.start = IRQ_EINT(16),
+		.end = IRQ_EINT(16),
+		.flags = IORESOURCE_IRQ
+	},
+	.....
+}
+2.分配初始化platform_device
+struct platform_device btn_dev = {
+	.name = "mybtn",//必须有
+	.id = -1,//如果有多个同名的节点，使用id来区分
+	.num_resource = ARRAY_SIZE(btn_res);
+	.resource = btn_res
+};
+3.调用platform_device_register(&btn_dev)向内核注册
+1）将btn_dev节点添加到dev链表
+2）遍历drv链表进行匹配工作,如果匹配成功,调用对应的platform_driver.probe函数，同时将btn_dev的首地址传递给probe函数
+
+platform_driver如何实现
+1.分配初始化platform_driver
+struct platform_driver btn_drv = {
+	.driver = {
+		.name = "mybtn",//一定要和对应的硬件节点中的name相同
+	},
+	.probe = btn_probe,//匹配成功执行
+	.remove = btn_remove，//删除软件节点或者硬件节点时执行
+	....
+};
+2.调用platform_driver_register(&btn_drv)向内核注册
+1）将btn_drv节点添加到drv链表
+2）遍历dev链表进行匹配工作,如果匹配成功,调用对应的platform_driver.probe函数，同时将btn_dev的首地址传递给probe函数
+
+使用platform实现一个驱动框架
+
+
+input子系统：输入子系统
+input子系统的框架：
+app:open,read,write
+---------------------
+input核心层(drivers/input/input.c)
+1.对上(应用层)提供统一的访问接口
+2.对下(驱动)提供了统一的注册硬件到核心层的方法
+---------------------------------------------
+设备驱动层
+1.只关心硬件信息
+
+对上的统一的访问接口是什么样的？
+对下提供的注册硬件的方法是什么样的？
+如何实现一个input子系统的按键驱动？
+这些信息都在input核心层代码中
+
+input核心层：
+subsys_initcall(input_init);
+//注册一个字符设备,并且提供统一的访问接口input_fops
+register_chrdev(INPUT_MAJOR, "input", &input_fops);
+
+static const struct file_operations input_fops = {
+	.owner = THIS_MODULE,
+	.open = input_open_file,
+};
+
+其他的访问接口在哪里？
+访问设备是先调用open，先调用input_open_file
+
+input_open_file：
+	struct input_handler *handler;
+	const struct file_operations *old_fops, *new_fops = NULL;
+	//以次设备号/32为下标，在input_table数组中取出一项		//input_handler
+	handler = input_table[iminor(inode) >> 5];
+	//?该数组何时被初始化，被填充
+	//从取出的一项handler中得到fops赋值给new_fops
+	new_fops = fops_get(handler->fops);
+	//备份旧的操作函数集合
+	//更新新的操作函数集合
+	old_fops = file->f_op;
+	file->f_op = new_fops;
+	//以后应用程序调用read,write....等
+	//操作接口时最后访问的是handler->fops
+	//handler->fops->open
+	new_fops->open(inode, file)
+
+
+关注input_handler何时被填充
+input_register_handler中完成的
+int input_register_handler(struct input_handler *handler)
+//肯定在内核的其他位置，会调用该函数完成对数组的填充
+input_register_handler：
+	struct input_dev *dev;
+	//把分配初始化好的input_handler填充到数组中
+	input_table[handler->minor >> 5] = handler;
+	//将input_handler填充到input_handler_list链表中
+	list_add_tail(&handler->node, &input_handler_list);
+	//遍历input_dev_list链表，将handler和每一个节点进行匹配
+	list_for_each_entry(dev, &input_dev_list, node)
+		input_attach_handler(dev, handler);
+	
+1.input_handler_list何时被遍历？
+2.input_dev_list何时被添加
+3.input_attach_handler函数完成了什么功能
+
+1和2在input_register_device完成
+int input_register_device(struct input_dev *dev)
+//在内核其他位置,分配初始化input_dev，调用此函数进行注册
+input_register_device：
+	//把分配初始化号的input_dev添加到input_dev_list链表中
+	list_add_tail(&dev->node, &input_dev_list);
+	//遍历input_handler_list，取出每一个节点和input_dev进行匹配
+	list_for_each_entry(handler, &input_handler_list, node)
+		input_attach_handler(dev, handler);
+
+input_attach_handler做了什么事情？
+	//1.匹配input_dev和input_handler
+	input_match_device(handler, dev);
+	//2.如果匹配成功，说明软件和硬件建立了连接
+	//(设备注册和硬件的处理)
+	handler->connect(handler, dev, id);
+	
+

@@ -1,0 +1,324 @@
+linux内核
+linux-2.6.35.7
+一.linux内核源代码的目录
+arch:与体系结构相关的目录，对于每种架构的CPU，arch下都有一个目录与之对应		arch/arm
+block：块设备的通用函数(字符设备  块设备  网络设备)
+drivers:设备的驱动程序
+firmware:设备驱动，固件，闭源设备的代码，设备没有公开，没有说明手册
+fs:file system,内核支持的文件系统的类型的代码
+include：头文件
+init:内核的初始化代码
+ipc:进程间通信的代码,管道，信号，共享内存，消息队列，信号量集
+kernel:内核管理的核心代码，与处理器相关的核心代码在arch/arm/kernel
+lib:库文件
+mm:和硬件无关的内存管理代码，与硬件相关的内存管理代码在arch/arm/mm
+net:网络协议相关的代码
+sound:声卡驱动代码
+tools:内核代码相关的工具
+Documentation：当前内核版本的说明信息，有较强的参考价值
+
+arch/arm
+boot:存放编译好的内核镜像
+	vmlinux:在内核源代码根目录下的ELF文件
+	Image:在boot下的未压缩的内核镜像文件，将vmlinux通过				arm-linux-objcopy处理后得到的只包含内核数据的内核镜像
+	zImage:在boot下,压缩的内核镜像文件，压缩比50%
+
+Image加载的时间
+	V
+zImage加载时间+解压时间
+自解压：zImage在真正运行之前，要进行自解压，自解压的代码在啊boot/compressed
+
+configs:系统提供的配置文件
+include:与架构相关的头文件
+kernel:与架构相关的内核管理文件
+lib:库文件
+mm:与架构相关的内存管理文件
+tools:工具
+
+mach-s5pv210
+mach-*.c:开发板文件
+
+二.内核Makefile
+顶层Makefile:		复杂
+各级子目录Makefile:	简单
+对当前目录的源文件集当前目录下的文件夹，定义编译规则
+
+顶层Makefile:
+1.确定编译器
+ 191 ARCH        = arm
+ 192 CROSS_COMPILE   = arm-linux-
+
+2.编译哪些文件
+ 479 init-y      := init/
+ 480 drivers-y   := drivers/ sound/ firmware/
+ 481 net-y       := net/
+ 482 libs-y      := lib/
+ 483 core-y      := usr/
+ 652 core-y      += kernel/ mm/ fs/ ipc/ security/ crypto/ block/
+在arch/arm/Makefile中
+110 head-y      := arch/arm/kernel/head$(MMUEXT).o arch/arm/kernel/init_task.o
+
+ 29 ifeq ($(CONFIG_MMU),)
+ 30 MMUEXT      := -nommu
+ 31 endif
+//如果CPU有MMU，head-y     := arch/arm/kernel/head.o (head.S)arch/arm/kernel/init_task.o
+//如果CPU没有MMU，head-y     := arch/arm/kernel/head-nommu.o (head-nommu.S)arch/arm/kernel/init_task.o
+
+3.怎样编译这些文件(存在于各级子目录下的Makefile中)
+
+4.链接过程
+ 698 vmlinux-init := $(head-y) $(init-y)
+ 699 vmlinux-main := $(core-y) $(libs-y) $(drivers-y) $(net-y)
+ 700 vmlinux-all  := $(vmlinux-init) $(vmlinux-main)
+ 701 vmlinux-lds  := arch/$(SRCARCH)/kernel/vmlinux.lds
+
+SECTIONS
+ 21 {
+ 22 #ifdef CONFIG_XIP_KERNEL
+ 23     . = XIP_VIRT_ADDR(CONFIG_XIP_PHYS_ADDR);
+ 24 #else
+ 25     . = 0xC0000000 + 0x00008000;
+ 26 #endif
+
+ 27 //与处理器相关的信息
+ 34         __proc_info_begin = .;
+ 35             *(.proc.info.init)
+ 36         __proc_info_end = .;
+    //与开发板相关的信息
+ 37         __arch_info_begin = .;
+ 38             *(.arch.info.init)
+ 39         __arch_info_end = .;
+
+内核启动过程：
+加载zImage镜像，自解压
+arch/arm/boot/compressed/head.S
+wont_overwrite:	mov	r0, r4
+		mov	r3, r7
+		bl	decompress_kernel
+		b	call_kernel
+decompress_kernel定义在misc.c文件中
+	putstr("Uncompressing Linux...");
+	do_decompress(input_data, input_data_end - input_data,
+			output_data, error);
+	putstr(" done, booting the kernel.\n");
+
+linux开始真正运行：
+head-y     := arch/arm/kernel/head.o
+arch/arm/kernel/head.S
+78 ENTRY(stext)
+ 79     setmode PSR_F_BIT | PSR_I_BIT | SVC_MODE, r9 @ ensure svc mode
+//将CPU设置为管理模式
+ 80                         @ and irqs disabled
+ 81     mrc p15, 0, r9, c0, c0      @ get processor id
+//通过协处理器指令将CPU的ID号读出来
+ 34         __proc_info_begin = .;
+ 35             *(.proc.info.init)
+ 36         __proc_info_end = .;
+//匹配CPU的ID
+ 82     bl  __lookup_processor_type     @ r5=procinfo r9=cpuid
+//用R9到该段中进行匹配，如果匹配不成功，报错
+ 83     movs    r10, r5             @ invalid processor (r5=0)?
+ 84     beq __error_p           @ yes, error 'p'
+//匹配开发板的ID
+ 85     bl  __lookup_machine_type       @ r5=machinfo
+//将r1里的开发板ID号与该段中的命令结构体中的ID号进行匹配
+//如果匹配成功,返回开发板结构体的地址
+//失败则报错
+ 86     movs    r8, r5              @ invalid machine (r5=0)?
+ 87     beq __error_a           @ yes, error 'a'
+ 88     bl  __vet_atags
+ 89     bl  __create_page_tables
+
+
+开发板文件
+arch/arm/mach-s5pv210/mach-smdkc110.c
+三星参考板的开发板文件
+
+开发板结构体
+
+static const struct machine_desc __mach_desc_SMDKV210	
+ __used							
+ __attribute__((__section__(".arch.info.init"))) = {
+//开发板结构体要放在.arch.info.init段中，为了编译内核启动时匹配开发板的//ID，返回该结构体的地址
+	.nr		= MACH_TYPE_SMDKV210,	
+//arch/arm/tools/mach-types
+//2443 smdkv210        MACH_SMDKV210       SMDKV210        2456
+	.name		= "SMDKV210",
+	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+	.phys_io	= S3C_PA_UART & 0xfff00000,
+	.io_pg_offst	= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
+	.boot_params	= S5P_PA_SDRAM + 0x100,
+	.init_irq	= s5pv210_init_irq,
+	.map_io		= smdkc110_map_io,
+	.init_machine	= smdkc110_machine_init,
+	.timer		= &s5p_systimer,
+};
+
+#define MACHINE_START(_type,_name)			
+static const struct machine_desc __mach_desc_##_type	
+ __used							
+ __attribute__((__section__(".arch.info.init"))) = {	
+	.nr		= MACH_TYPE_##_type,		
+	.name		= _name,
+
+#define MACHINE_END				
+};
+
+linux内核的启动过程
+1.自解压
+2.设置CPU为管理模式
+3.验证当前内核是否支持当前CPU,使用协处理器指令读出CPU的ID号，
+	r9和.proc.info.init进行比较
+4.验证内核是否支持当前开发板，
+	theKernel(0,2456,0x20000010)
+		  r0 r1    r2
+	r1和.arch.info.init进行比较
+5.建立页表
+.....
+20.挂载根文件系统
+21.启动init进程
+
+
+三.linux内核配置
+make menuconfig（最常用的配置内核的方法）
+make config
+make oldconfig
+....
+执行make menuconfig出现了以下错误，说明字体太大，缩小字体
+Your display is too small to run Menuconfig!
+It must be at least 19 lines by 80 columns.
+make[1]: *** [menuconfig] 错误 1
+make: *** [menuconfig] 错误 2
+
+ctrl+/ctrl-	放大和缩小字体
+
+
+make menuconfig的操作方法
+[*]:通过空格键，选中，表示该选项要编译进内核
+	File systems  ---> 
+		[*]   Ext2 extended attributes
+	1756 CONFIG_EXT2_FS_XATTR=y	(.config)
+
+[ ]:通过空格键,不选,表示不编译进内核
+	1756 # CONFIG_EXT2_FS_XATTR is not set
+
+<*>:通过空格键，选中，表示该选项要编译进内核
+	File systems  ---> 
+		<*> Second extended fs support 
+	1755 CONFIG_EXT2_FS=y
+
+< >:通过空格键，不选，表示不编译进内核
+	1755 # CONFIG_EXT2_FS is not set
+
+<M>:通过空格键，选M，表示该选项编译成模块
+	755 CONFIG_EXT2_FS=m
+
+每个配置选项<----->对应一个变量
+配置的过程，实际上就是对变量赋值
+通过配置菜单，对变量进行赋值
+变量的值最终保存在.config文件中
+
+make smdkv210_android_defconfig
+该命令的作用就是将arch/arm/configs/smdkv210_android_defconfig拷贝到源代码的根目录下，同时改名为.config
+
+System Type  --->
+ 	ARM system type (Samsung S5PV210/S5PC110)  --->
+
+	Board selection (SMDKV210)  --->
+	( ) Samsung Aquila                       
+        ( ) GONI                                 
+        (X) SMDKV210                             
+        ( ) SMDKC110                              
+        ( ) Herring  
+1.确定了当前内核支持的处理器架构(ARM)
+2.确定了当前内核支持的CPU类型(s5pv210)
+3.确定了当前内核支持的开发板(SMDKV210)
+arch/arm/mach-s5pv210/mach-smdkc110.c
+
+在.config中
+  (X) SMDKV210
+ 	302 CONFIG_MACH_SMDKV210=y
+
+在arch/arm/mach-s5pv210/Makefile
+ 24 obj-$(CONFIG_MACH_SMDKV210) += mach-smdkc110.o
+ 26 obj-$(CONFIG_MACH_SMDKV210) += smdkc110-rtc.o
+
+  8 obj-y   :=		表示后面的*.o文件要编译进内核(zImage)
+  9 obj-m   :=		表示后面的*.o文件要编译成模块
+ 10 obj-n   :=		表示不编译
+
+mach-smdkc110.c是否要编译进内核，如何编译取决于变量CONFIG_MACH_SMDKV210的值，该变量在.config文件中被定义为
+CONFIG_MACH_SMDKV210=y
+24 obj-y += mach-smdkc110.o
+表示mach-smdkc110.c要编译进内核
+
+
+Kconfig文件
+该文件是用来生成配置内核的界面，是各种配置界面的源文件，内核配置工具通过读取各个目录下的Kconfig文件,生成了配置界面共开发人员进行内核配置，配置的结果保存在.config中
+make menuconfig的主界面的配置文件是arch/arm/Kconfig
+
+File systems  --->
+ 	[*] Miscellaneous filesystems  --->
+		<*>   Compressed ROM file system support (cramfs) 
+		1844 CONFIG_CRAMFS=y
+
+fs/cramfs/Kconfig
+  1 config CRAMFS
+  2     tristate "Compressed ROM file system support (cramfs)"
+  3     depends on BLOCK
+  4     select ZLIB_INFLATE
+  5     help
+  6       Saying Y here includes support for CramFs (Compressed ROM File
+  7       System).  CramFs is designed to be a simple, small, and compressed
+
+1.config条目
+	config CRAMFS定义了一个变量,系统会默认在该变量名加前缀CONFIG_
+	CONFIG_CRAMFS
+   变量的类型
+	tristate:三态（y/m/n）
+	bool:布尔型(y/n)
+	string:字符串
+	int:整型
+	hex:十六进制
+   depends on:依赖关系
+	如果依赖的配置选项没有选中，此选项也无法选中
+   select:反向依赖
+	如果当前选项选中，那么也会选中select后面的选项
+   help:帮助信息
+
+2.menu条目
+   生成菜单,以endmenu结束
+
+3.choice条目
+   将多个同类型的选项组合在一起，多选一，以endchoice结束
+
+4.comment条目
+   注释信息
+
+linux内核配置
+make menuconfig
+在linux内核源代码目录下,make menuconfig打开内核的配置菜单，这是配置内核的主菜单，在此界面下配置内核的各项功能，可以增加某些功能，也可以去掉某些功能，这就是内核的配置(裁剪)
+Kconfig->生成当前目录下源文件的配置界面
+	->配置对应的选项<-->变量
+	[] <>	赋值
+.config->保存配置的结果(变量的值)
+Makefile->定义了各个源文件目录下的编译规则
+	obj -y
+	obj -m
+	obj -n
+	读取.config文件进行编译
+
+
+如何关闭新开发板的蜂鸣器
+vi arch/arm/mach-s5pv210/mach-dy210.c
+将735行改成
+ 735 #define S5PV210_GPD_0_0_TOUT_0  (0x0)
+
+make distclean可以清除所有的配置
+
+
+	
+
+
+
+

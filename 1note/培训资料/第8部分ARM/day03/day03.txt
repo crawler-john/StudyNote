@@ -1,0 +1,65 @@
+一.ARM裸机编程
+在只有硬件平台，没有其他操作系统或者软件支持的硬件平台上的编程就叫裸机编程，没有任何库，系统调用等软件功能，你需要任何功能都要自己实现。
+
+ARM裸机编程主要学习如何实现对硬件的操作(驱动)
+裸机开发的步骤
+以LED为例
+1.看原理图
+了解要操作硬件和CPU之间的连接方式，连接到了CPU的哪个位置(哪个管脚)，明确硬件的工作方式和CPU对应管脚是哪一类管脚
+对应的管脚给低电平，亮
+对应的管脚给高电平，灭
+连接到了CPU上的GPIO管脚GPJ2_0 --- GPJ2_3
+
+2.查看要操作的硬件的说明手册(略)，明确硬件内部的操作方式和工作原理
+
+3.查看CPU的芯片手册，明确连接要操作硬件的管脚的操作方法
+
+
+GPIO管脚
+通用输入输出端口
+
+GPJ2CON  	0xE0200280 	配置寄存器
+= 0x1111
+(GPJ2CON&(~0xffff))|0x1111
+ 
+GPJ2DAT  	0xE020_0284  	数据寄存器
+对应的位给1，输出高电平
+反之，输出低电平
+
+GPJ2PUD  	0xE020_0288 	上下拉配置寄存器
+禁止上下拉
+=0
+GPJ2PUD&(~0xff)
+
+ 
+控制LED进行闪烁，伪代码怎么写
+1.初始化
+GPJ2CON  = 0x1111
+GPJ2PUD = 0
+2.闪烁
+while(1)
+{
+	GPJ2DAT = 0;
+	delay
+	GPJ2DAT = 0xf;
+	delay
+}
+
+交叉编译工具
+arm-linux-gcc
+虚拟机编译：
+arm-linux-gcc -nostartfiles -nostdlib -e start -Ttext 20008000 led.S -o led
+arm-linux-objcopy -O binary led led.bin
+cp led.bin /tftpboot
+
+串口工具的命令行输入：
+tftp 20008000 led.bin
+go 20008000
+
+
+
+
+
+
+
+

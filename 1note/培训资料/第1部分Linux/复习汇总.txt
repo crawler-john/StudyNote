@@ -1,0 +1,217 @@
+Linux安装
+1、安装方法
+	通过刻录USB安装：使用iso刻录工具，将安装光盘镜像刻录到U盘上
+	通过ISO刻录CD
+	通过硬盘方式，ubuntu有硬盘安装的程序
+	如果使用虚拟机方式安装，直接采用挂载iso文件作为光驱的方式即可
+	使用以下命令可以将FAT32格式的分区转换为NTFS：
+	“开始”-“运行”中输入“cmd”，convert d: /fs:ntfs,再输入D盘的名称即可
+2、安装注意点：
+	安装类型选择，如果是实体机安装，需要选择是否和windows系统共存
+	虚拟机中安装ubuntu，硬盘空间至少要8G以上，详细步骤请参见《Ubuntu安装步骤》
+	ubuntu系统的使用，请参见《Ubuntu桌面培训》
+	ubuntu在线中文社区：ubuntu.org.cn
+	Ubuntu 命令技巧（中文）：http://wiki.ubuntu.org.cn/UbuntuSkills
+3、虚拟机的卸载
+	直接删除虚拟机所在文件夹即可，如果需要保留硬盘，只需要保留扩展名为vmdk的磁盘文件即可
+4、虚拟机增加硬盘
+	直接添加现有硬盘文件即可
+5、虚拟机的操作：挂载U盘、快照、网络设置、焦点转移
+	使用vm菜单中的挂载移动设备选项，快照使用vm菜单中的snapshot即可
+   通过虚拟机软件的共享文件夹选项共享文件给虚拟机:
+		如果选项是灰色，需要在ubuntu中运行以下命令打开选项：
+       cd  /usr/bin
+		sudo ./vmware-config-tools.pl
+		共享文件夹所在目录：/mnt/hgfs
+	网络设置：注意NAT模式、桥接模式的区别
+	输入焦点转移：ctrl+alt即可切换焦点
+6、如果安装ubuntu 12.1，需要按照安装文档进行设置（更新源、分辨率），进行一次系统更新后，按顺序安装以下软件包
+	sudo apt-get install vim
+	vim
+	ifs
+	samba
+	subversion
+	mysql
+7、linux系统的安装时，至少要两个分区，一个是主分区，一个是交换分区（swap）
+8、linux系统和windows的区别
+	文件系统：ext；fat32、NTFS
+	分区方式：swap分区；虚拟内存文件
+	分区编号：使用磁盘类型+磁盘顺序号+分区顺序号进行编号（hda5:表示第一块IDE接口的硬盘上的第一个扩展分区）；分区从C开始
+	文件组织：集中在一个根目录；集中在每个分区（例如C、D）
+	设备识别：每种设备均被视为文件；单独管理(/dev)，有设备管理器
+	文件名称大小写：严格区分大小写；不区分
+9、查看内核版本号
+	uname -a
+	内核分为稳定版和开发版
+===================================================================
+
+常见命令
+1、帮助类
+	whatis、info、man、help参数
+2、目录和文件管理类
+	mkdir、rmdir、ls、pwd
+	touch、cp、mv、rm、find
+3、文本文件查看、操作类
+	cat、more、less、head、tail
+	编辑：vi、gedit
+	归档、压缩、解压缩：tar 注意区分：c t z j x参数
+   创建归档： tar cvf demo.tar *.txt
+   查看归档:  tar tvf demo.tar
+   恢复归档： tar xvf demo.tar
+   压缩归档： tar czvf demo.tar.gz *.txt
+   查看压缩归档： tar tzvf demo.tar.gz
+   恢复压缩归档： tar xzvf demo.tar.gz
+4、系统管理类
+	ps、kill、fdisk、reboot、shutdown
+	在ubuntu中使用apt-get安装软件包、RHEL中采用rpm进行安装
+	设备的挂载和卸载：mount和umount，在red hat中，要特别注意加t参数
+	挂载U盘：mount -t vfat /dev/sdb1 /mnt
+	挂载光盘：mount -t iso9660 /dev/cdrom /mnt
+5、用户和组管理类
+	whoami、useradd(adduser)、userdel、groupadd、
+6、权限管理类
+	chmod、chown、chgrp、su、sudo、passwd
+	chmod中要特别注意区分三个组:拥有者、同组用户、其他用户，三个权限：rwx
+
+===================================================================
+
+redhat 虚拟机中解决vimtutor乱码问题:
+gedit /usr/share/vim/vim70/tutor/tutor.zh.euc
+打开后以utf8格式原名覆盖保存即可使用vimtutor
+配置文件中增加以下内容可以打开行号显示和设置tab键空格数量
+cd ~
+vi .vimrc
+set nu
+set ts=4
+===================================================================
+执行脚本的方法：
+	bash：	调试时用，直接让shell解释执行
+	.:		直接使用命令执行，要注意授权（执行权限）
+在shell脚本中，test 进行比较时，比较的是字符，如果需要比较数字，需要使用eq等操作符
+===================================================================
+
+
+NFS服务器
+
+1、修改/etc/exports文件,增加共享目录和共享设置 /home/share *(rw)
+
+2、重启portmap和nfs服务 
+   service portmap restart 
+   service nfs restart
+
+3、如果只修改配置文件，可以只强制配置文件生效 exportfs -rv
+
+4、客户端和服务器互相能ping通，客户端查看服务器共享 showmount -e 127.0.0.1
+
+5、挂载服务端共享目录至客户端 mount -t nfs 127.0.0.1:/home/share /mnt/nfs
+
+
+
+smb服务器
+安装服务器和客户端：smb-common和smb-client,ubuntu是samba4
+
+从windows访问linux，首先互相ping通
+1、在linux中添加系统用户 adduser user1
+2、在samba服务中添加用户 smbpasswd -a user1
+3、重启samba服务 service smb restart
+4、在windows中输入 \\192.168.0.128 打开linux共享，双击user1文件夹，即可以进入user1文件夹进行操作
+
+从linux中访问windows
+1、设置一个共享文件夹，例如：F:\share
+2、在“开始”-“运行”中，输入 192.168.42.1\share，应该可以打开自己的共享文件夹
+3、登录linux，ping通windows
+4、使用mount -o username=administrator //192.168.42.1/share /mnt 将windows共享绑定到本地
+
+tftp服务端安装和配置步骤
+1 rpm -qa|grep tftp
+    tftp-server-0.49-2.el5.centos   server
+    tftp-0.49-2.el5.centos          client
+2 rpm -qa|grep xinetd
+  xinetd-2.3.14-10.el5
+		
+3 修改配置文件 
+vim /etc/xinetd.d/tftp 
+
+service tftp?{
+socket_type = dgram?
+protocol = udp?
+wait = yes?
+user = root?
+server = /usr/sbin/in.tftpd?
+server_args = -s /tftpboot?
+disable = no?
+per_source = 11?
+cps = 1002?
+flags = IPv4} 
+
+加入一个测试文件：
+  cd /tftpboot
+  touch hello.c
+		
+4  重启服务：service xinetd start
+	
+5  tftp 192.168.1.101 
+	   tftp-> get hello.c
+	   tftp->q          /quit
+===================================================================
+
+gcc
+gcc如果不加参数，直接调用gcc hello.c的话，将生成一个名为a.out的可执行文件
+参数：
+	-o 输出，可以给输出文件取一个名字
+	-E 预编译 gcc -E hello.c -o hello.i
+	-S 编译  gcc -S hello.i -o hello.s
+     	-c 汇编	 gcc -c hello.s -o hello.o  
+	将汇编代码和库函数进行链接 gcc hello.o -o hello
+
+gdb
+在gcc编译时要添加-g选项
+next命令和step命令的区别：是否跳转进入函数
+如果需要在运行时修改变量值：set
+常用命令：显示代码l、设置断点b、运行代码r、打印变量p、继续执行c、退出quit
+
+===================================================================
+
+makefile
+makefile的常用文件名：Makefile
+Makefile中常见的语法错误：tab键被替换为空格
+makefile的详细过程，请参见《自动生成Makefile的详细过程》
+makefile的高级用法，请参见《跟我一起写 Makefile》
+
+===================================================================
+
+SVN
+windows下SVN软件安装步骤：
+服务器端（svn-1.4.3-setup.exe）
+客户端（TortoiseSVN-1.6.5.16974-win32-svn-1.6.5.msi）
+汉化中文包（LanguagePack_1.6.5.16974-win32-zh_CN.msi）
+
+重要概念：
+代码仓库、工作拷贝、导入、导出
+签出、更新、提交
+
+烧机步骤：
+1、安装USB转串口驱动：usb转串口驱动.rar，解压后根据操作系统安装
+2、安装USB下载驱动：FriendlyARM USB Download Driver Setup_20090421.exe
+3、运行超级终端:
+		开始-->附件-->通信-->超级终端
+		（如出现中华人民共和国，取消，是）
+		连接描述->起个名字你爱听的名字，选个你喜欢的图片
+		连接到 com6(右键我的电脑，设备管理器，看到USB转串口设备的虚拟com号码)
+		com6属性 
+			每秒位数（波特率） 115200
+			硬件流： 无
+		回车后，此时能看到一个终端，可以看到开发板的控制台，
+		如果开发板直接启动，不显示控制台，需要
+将开发板的启动开关切换到下方，再重新启动，即使用Nor Flash启动
+4、格式化flash：在终端中输入x
+5、下载bootloader
+	在终端中输入v，打开dnw，选择usb port-tranmit-tranmit，选择文件下载：
+	文件名为：supervivi-128M
+6、下载内核文件
+	在终端中输入k，切换至dnw，选择usb port-tranmit-tranmit，选择文件下载：
+	文件名为：zImage_W35
+7、下载文件系统
+	在终端中输入y，切换至dnw，选择usb port-tranmit-tranmit，选择文件下载：
+	文件名为：rootfs_qtopia_qt4.img
+安装成功！全新系统诞生

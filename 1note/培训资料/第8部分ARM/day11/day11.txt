@@ -1,0 +1,132 @@
+三.linux驱动
+1.搭建环境
+准备内核
+把kernel.tar.bz2拷贝到虚拟机
+解压进入源代码
+cp sq210_deconfig .config
+
+关闭蜂鸣器
+vi arch/arm/mach-s5pv210/mach-sq210.c
+将735行改成
+ 735 #define S5PV210_GPD_0_0_TOUT_0  (0x0)
+
+make zImage
+
+都是把驱动程序编译成模块
+内核模块编程的特点
+1)不能使用C库和C标准头文件
+2)没有内存保护机制
+3)不能处理浮点运算
+4)注意同步和并发
+5)注意可移植性
+
+2.linux内核模块的实现
+加载函数
+int xxx(void)
+{
+	return 0;//加载成功
+	return 负值;//加载失败
+}
+
+卸载函数
+void yyy(void)
+{
+
+}
+
+使用module_init修饰加载函数
+使用module_exit修饰卸载函数
+告诉内核这是模块的入口和出口函数
+
+内核中的打印函数为printk
+
+使用内核的编译规则编译生成.ko的模块文件
+将该模块文件拷贝到根文件系统
+
+模块许可证
+MOUDULE_LICENSE("GPL v2");
+
+
+3.模块操作命令：
+insmod:模块加载命令
+	内核会执行加载函数
+rmmod:模块卸载命令
+	内核会执行卸载函数
+lsmod:查看当前已经加载的模块
+
+modinfo:查看模块信息
+modprobe:也是模块加载命令
+和insmod的区别在于，modprobe会检查模块的依赖信息，根据module.dep进行检查，如果没有该文件，modprobe就会失败
+module.dep文件的路径为/lib/modules/内核版本号/modules.dep
+下面目录是用来存放modprobe加载的.ko文件
+/home/student/workdir/rootfs/lib/modules/2.6.35.7/extra
+
+如何创建module.dep文件
+make modules_install INSTALL_MOD_PATH=/home/student/workdir/rootfs
+
+4.模块的依赖(互相调用)
+使用内核导出符号(EXPORT_SYMBOL)修饰希望被其他模块调用的函数
+
+5.printk的输出级别和内核的输出级别
+如何查看内核的输出级别
+cat /proc/sys/kernel/printk 文件
+	7 ....
+表示内核的默认输出级别为7
+大于等于7的输出级别的语句不会打印
+只打印输出级别小于7的语句
+
+echo 4 > /proc/sys/kernel/printk
+将系统默认输出级别改为4
+如果不给printk函数设置输出级别，那么他的默认输出级别为4
+
+通过修改/proc/sys/kernel/printk来修改输出级别不能修改内核启动时的输出级别
+如果要修改内核启动时的输出级别，那么可以通过uboot传递参数的方式实现
+
+set bootargs root=/dev/nfs init=/linuxrc nfsroot=192.168.1.141:/home/student/workdir/rootfs ip=192.168.1.20:192.168.1.141:192.168.1.1:255.255.255.0::eth0:on console=ttySAC0,115200 debug //默认输出级别为10
+
+set bootargs root=/dev/nfs init=/linuxrc nfsroot=192.168.1.141:/home/student/workdir/rootfs ip=192.168.1.20:192.168.1.141:192.168.1.1:255.255.255.0::eth0:on console=ttySAC0,115200 quiet //默认输出级别为4
+
+set bootargs root=/dev/nfs init=/linuxrc nfsroot=192.168.1.141:/home/student/workdir/rootfs ip=192.168.1.20:192.168.1.141:192.168.1.1:255.255.255.0::eth0:on console=ttySAC0,115200 loglevel=6 
+
+6.模块参数
+内核的模块参数和一般参数的区别在于
+模块参数可以在加载模块时和加载模块后给模块传递相应的参数信息
+module_param
+module_param_array
+
+模块参数的权限不为0，那么会存在对应的一个文件
+sys/module/模块名/paramters/模块参数名
+为0则不会有这样一个文件
+
+修改对应文件的内容就是修改对应的模块参数
+
+7.系统调用的实现
+原理：
+1）应用程序调用open
+2）进程会调用C库的open函数的实现
+3）C库中的open实现会将open对应的系统调用号保存在寄存器中
+4）C库中的open实现会调用swi(svc)触发一个软中断异常
+5）进程会跳转到内核指定的一个位置
+6）对应的位置就是内核定义好的异常向量的入口vector_swi
+7)这个函数会格局系统调用号在事先定义的一个系统调用表中找到对应的open的内核实现(sys_open)
+8)执行sys_open
+9)执行完毕后，原路返回用户空间
+
+如何添加一个系统调用
+1.在内核代码arch/arm/kernel/sys_arm.c文件添加一个系统调用的内核实现sys_add
+int sys_add(int x,int y)
+{
+	return x+y;
+}
+
+2.在内核代码arch/arm/include/asm/unistd.h中添加一个新的系统调用号
+__NR_add
+395 #define __NR_add                (__NR_SYSCALL_BASE+366)
+
+3.在内核代码arch/arm/kernel/calls.S中的系统调用表sys_call_table中添加一项CALL(sys_add)
+378         CALL(sys_add)
+
+4.在用户空间调用syscall完成调用新添加的系统调用实现（sys_add）
+syscall会实现swi(svc)，你只需要传递一个系统调用号
+
+

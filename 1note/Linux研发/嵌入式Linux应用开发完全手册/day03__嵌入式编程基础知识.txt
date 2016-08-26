@@ -1,0 +1,86 @@
+目标：
+了解交叉编译工具链的各种选项
+掌握连接脚本的编译方法
+了解Makefile文件中常用的函数
+了解几个常用的ARM汇编指令
+了解汇编程序调用C函数所遵循的ATPCS规则
+
+3.1交叉编译工具选项说明
+    原文件需要经过编译才能生成可执行文件。
+    PC上的编译工具链为gcc、ld、objcopy、objdump等，它们编译出来的程序在X86上运行。要编译出能在ARM平台上运行程序，必须使用交叉编译工具arm-linux-gcc、arm-linux-ld等
+    3.1.1arm-linux-gcc选项
+	一个c/c++文件要经过预处理、编译、汇编和连接等4步才能变成可执行文件。
+	（1）预处理
+	    预处理就是将要包含的文件插入源文件中、将宏展开、根据条件编译命令选择要使用的代码，最后将这些代码输出到一个".i"文件中等待进一步的处理。预处理将用到arm-linux-cpp工具。
+	（2）编译
+	    编译就是将C/C++代码（比如上面的".i"）“翻译”成汇编代码，所用到的工具为cc1
+	（3）汇编
+	    汇编就是将第二部输出的汇编代码翻译成符合一定格式的机器代码。在Linux系统上一般表现为ELF目标文件（OBJ文件），用到的工具为arm-linux-as。“反汇编”是指机器代码转换为汇编代码，在调试程序中经常用到。
+	（4）连接
+	    连接就是将上步生成的OBJ文件和系统库的OBJ文件、库文件连接起来、最终生成可以在特定平台运行的可执行文件，用到的工具为arm-linux-ld。
+	1.总体选项（Overall Option）
+	    （1）-c	：预处理、编译和汇编源文件。但是不做连接。编译器根据源文件生成OBJ文件。
+	    （2）-S	：编译后即停止，不进行汇编。
+	    （3）-E	：预处理后停止，不进行编译。
+	    （4）-o file：指定输出文件为file
+	    （5）-v	：显示制作GCC工具自身时的配置命令；同时显示编译器驱动程序、预处理器、编译器的版本号。
+	2.警告选项（Warning Option）
+	    -Wall	：基本打开了所有需要注意的警告信息，比如没有指定类型的声明、在声明之前就使用的函数、局部变量出了什么就再没使用过。
+	3.调试选项（Debugging Option）
+	    -g		：以操作系统的本地格式（stabs、COFF、XCOFF、DWARF）产生调试信息，GDB能够使用这些调试信息。
+	4.优化选项
+	    （1）-O或-O1：优化：对于大函数、优化编译的过程将占用较长时间和相当大的内存。
+	    （2）-O2	：多优化一些，除了设计空间和速度交换的优化选项，执行几乎所有的优化工作。
+	    （3）-O3	：优化更多，除了打开“-O2”所做的一切，它还打开了“-finline-functions”选项。
+	    （4）-O0	：不优化
+	    注意：如果指定多个-O选项，生效的是最后一个选项。
+	5.连接器选项（Linker Option）
+	    （1）object-file-name	如果某些文件没有特别明确的后缀，GCC就认为他们是OBJ文件或库文件。如果GCC执行连接操作，这些OBJ文件将成为连接器输入文件。
+	    （2）-llibrary 		连接名为library的库文件。
+	    （3）-nostartfiles		比连接系统标准启动文件，而标准库文件仍然正常使用。
+	    （4）-nostdlib		不连接系统标准启动文件标准库文件，只把指定的文件传递给连接器。这个选项常常用来编译内核、bootloader等程序，它们不需要启动文件、标准库文件。
+	    （5）-static		在支持动态连接的系统上阻止连接共享库。
+	    （6）-shared		生成一个共享OBJ文件，它可以再和其他OBJ文件连接生成可执行文件。
+	    （7）-Xlinker option	把选项option传递给连接器。
+	    （8）-Wl，option		把选项option传递给连接器
+	    （9）-u symbol		使连接器认为取消了symbol的符号定义，从而连接库模板以取得定义。
+	5.目录选项（Directory Option）
+	    （1）-Idir			在头文件的搜索路径列表中添加dir目录
+	    （2）-I-			任何在“-I-”前面的“-I”选项指定的搜索路径只适合于“#include "file"”这种情况；他们不能同来搜索"#include <file>"包含的头文件。
+	    （3）-Ldir			在"-I"选项的搜索路径列表中添加dir目录
+	    （4）-Bprefix		这个选项之处在何处寻找可执行文件、库文件以及编译器自己的数据文件。
+
+    3.1.2 arm-linux-ld选项
+	1.直接指定代码段、数据段、bss段的起始地址
+	    格式如下：（startadd分别代表代码段、数据段和bss段的起始地址）
+	    -Ttext startaddr
+	    -Tdata startaddr
+	    -Tbss startaddr
+	2.使用连接脚本设置地址
+	    -Ttimer.lds （.lds是连接脚本文件）
+		SECTION{
+			. =0x30000000;
+			.text : {*(.text)}
+			.rodata ALIGN(4):{*(.rodata)}
+			.data ALIGN(4) : {*(.data)}
+			.bss ALIGN(4) : {*(.bss) *(COMMON)}
+			
+		}
+
+    3.1.3 arm-linux-objcopy选项
+	arm-linux-objcopy被用来复制一个目标文件的内容到另一个文件中，可以使用不同于源文件的格式来输出目标文件，即可进行格式转换。 常将ELF格式的可执行文件转换为二进制文件。
+	1.input-file、outfile	：表示输入目标文件（源目标文件）和输出目标文件（目的目标文件）
+	2.-l bfdname 或 --input-target=bdfname：用来指明源文件格式，bfdname是BFD库中描述的标准格式名
+	3.-O bfdname 或 --output-target=bfdname：使用指定格式的输出文件
+	4.-F bfdname 或 --target=bfdname：同事指明源文件、目标文件的格式
+	5.-R sectionname 或 --remove-section=sectionname：从输出文件中删掉所有名为sectionname的段，这个选项可以多次使用。
+	6.-S 或 --strip-all ：不从源文件中复制重定位信息和符号信息到目标文件中去。
+	7.-g 或 --strip-debug：不从源文件中复制调试符号到目标文件中去
+	
+    3.1.4 arm-linux-objdump选项
+
+
+    3.1.5 汇编代码、机器码和存储器的关系以及数据的表示
+
+3.2Makefile介绍
+

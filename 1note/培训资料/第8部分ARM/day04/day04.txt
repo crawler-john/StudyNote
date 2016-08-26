@@ -1,0 +1,115 @@
+交叉编译工具
+arm-linux-gcc -v 查看版本	4.4.1
+
+arm-linux-gcc 编译器
+	-nostartfiles:不加入起始文件
+	-nostdlib:不加入库
+	-e:指定程序入口
+	-Ttext:指定运行地址
+
+arm-linux-nm:查看目标文件，可执行文件中的符号列表
+arm-linux-readelf:读取elf格式文件的信息
+arm-linux-objdump:反汇编命令，可以把可执行文件反汇编成汇编文件
+arm-linux-objcopy:文件格式转换，主要是把elf文件转换成二进制或者16进制文件
+arm-linux-as:汇编器
+arm-linux-ld:链接器
+arm-linux-strip:去除目标文件和可执行文件的符号列表和调试信息
+
+
+volatile修饰符
+易变的，防止编译器优化
+如果使用volatile修饰的变量，每次使用它时都要去内存中取出他的值，而不使用寄存器中的备份
+哪些情况要使用volatile
+1.多线程编程的全局变量
+2.中断处理程序中使用的非自动变量
+3.硬件寄存器的地址
+
+如果网是通的，ping通，但是使用tftp下载时出现TTTTTT
+执行以下三个命令，重启tftp服务
+sudo /etc/init.d/xinetd reload
+sudo /etc/init.d/xinetd restart
+sudo service tftpd-hpa restart
+
+
+二.串口驱动
+1.看原理图
+串口有两根线，一根接收，一根发送，连接到了CPU上XuRXD0/GPA0_0和XuTXD0/GPA0_1
+这两个管脚也是GPIO管脚，可以配制成串口功能
+
+2.查看硬件的说明(略)
+
+3.查看CPU芯片手册(关注对应的寄存器)
+1）GPIO的配置
+GPA0CON		0xE020_0000	配置成串口功能
+= 0x22
+GPA0PUD		0xE020_0008	禁止上下拉
+=0
+
+2)串口控制器的配置
+ULCON0  	0xE290_0000  		线控寄存器(配置帧结构)
+= 0x3
+
+UCON0  		0xE290_0004  		控制寄存器(配置传输方式)
+= 0x5
+
+UFCON0  	0xE290_0008  		FIFO寄存器
+可以不配置，也可以配制成0	
+
+UMCON0  	0xE290_000C  		Modem寄存器
+可以不配置，也可以配制成0
+
+UTRSTAT0  	0xE290_0010  		收发的状态寄存器
+BIT0=1时,接收数据寄存器里有数据需要接收，
+BIT0=0时，接收数据寄存器里没有数据需要接收
+BIT1=1时，发送数据寄存器为空，可以写入下一个要发送的数据
+BIT1=0时，发送数据寄存器非空，说明数据还没有发送出去
+
+如果我们要接收数据，首先需要判断这个状态寄存器的BIT0，只有BIT0为1时才能接收数据
+如果我们要发送数据，首先需要判断这个状态寄存器的BIT1，只有BIT1为1时才能发送数据
+
+
+UTXH0  		0xE290_0020  	发送数据寄存器
+
+URXH0  		0xE290_0024  	接收数据寄存器
+
+UBRDIV0  	0xE290_0028  	波特率除数寄存器
+=35
+
+DIV_VAL = (PCLK / (bps x 16)) ?1
+=66700000/(115200X16)-1
+=36.187-1
+=35.187
+
+
+UDIVSLOT0  	0xE290_002C  	波特率除数修正寄存器
+UDIVSLOT0 = 0x0888
+
+(num of 1's in UDIVSLOTn)/16 = 0.187
+num of 1's in UDIVSLOTn = 3
+查表取得结果
+
+如何写串口的驱动
+1.初始化
+GPA0CON = 0x22;
+GPA0PUD = 0;
+ULCON0 = 0x3;
+UCON0 = 0x5;
+UBRDIV0 = 35;
+UDIVSLOT0 = 0x0888;
+
+2.接收和发送数据
+先查询状态寄存器UTRSTAT0，如果忙就继续等待，闲的话就进行发送或者接收数据
+
+C语言和汇编中的函数互相调用时如何传参
+
+如果函数个数小于等于三个，使用r0,r1,r2进行传参
+多于三个使用堆栈传递
+
+作业：
+是否可以实现我们制作的shell的删除功能
+提示：删除键的键值'\b'或者127
+
+
+
+
+

@@ -1,0 +1,84 @@
+一，HTML基础教程
+1.1 HTML简介
+	什么是 HTML？
+		HTML 是用来描述网页的一种语言。
+		HTML 指的是超文本标记语言 (Hyper Text Markup Language)
+		HTML 不是一种编程语言，而是一种标记语言 (markup language)
+		标记语言是一套标记标签 (markup tag)
+		HTML 使用标记标签来描述网页
+	HTML 标签
+		HTML 标记标签通常被称为 HTML 标签 (HTML tag)。
+		HTML 标签是由尖括号包围的关键词，比如 <html>
+		HTML 标签通常是成对出现的，比如 <b> 和 </b>
+		标签对中的第一个标签是开始标签，第二个标签是结束标签
+		开始和结束标签也被称为开放标签和闭合标签
+	HTML 文档 = 网页
+		HTML 文档描述网页
+		HTML 文档包含 HTML 标签和纯文本
+		HTML 文档也被称为网页
+1.2 HTML基础
+	HTML 标题 ： HTML 标题（Heading）是通过 <h1> - <h6> 等标签进行定义的。<h2>This is a heading</h2>
+	HTML 段落 ： HTML 段落是通过 <p> 标签进行定义的。	<p>This is another paragraph.</p> 
+	HTML 链接 ： HTML 链接是通过 <a> 标签进行定义的。	<a href="http://www.w3school.com.cn">This is a link</a>
+	HTML 图像 ： HTML 图像是通过 <img> 标签进行定义的。	<img src="w3school.jpg" width="104" height="142" />
+1.3 HTML元素
+	HTML 元素 ： HTML 元素指的是从开始标签（start tag）到结束标签（end tag）的所有代码。
+	HTML 元素语法
+		HTML 元素以开始标签起始
+		HTML 元素以结束标签终止
+		元素的内容是开始标签与结束标签之间的内容
+		某些 HTML 元素具有空内容（empty content）
+		空元素在开始标签中进行关闭（以开始标签的结束而结束）
+		大多数 HTML 元素可拥有属性
+	嵌套的 HTML 元素
+		大多数 HTML 元素可以嵌套（可以包含其他 HTML 元素）。
+		HTML 文档由嵌套的 HTML 元素构成。
+	空的 HTML 元素
+		没有内容的 HTML 元素被称为空元素。空元素是在开始标签中关闭的。
+		<br> 就是没有关闭标签的空元素（<br> 标签定义换行）。
+		在 XHTML、XML 以及未来版本的 HTML 中，所有元素都必须被关闭。
+		在开始标签中添加斜杠，比如 <br />，是关闭空元素的正确方法，HTML、XHTML 和 XML 都接受这种方式。
+		即使 <br> 在所有浏览器中都是有效的，但使用 <br /> 其实是更长远的保障。
+	HTML 提示：使用小写标签
+		HTML 标签对大小写不敏感：<P> 等同于 <p>。许多网站都使用大写的 HTML 标签。
+		W3School 使用的是小写标签，因为万维网联盟（W3C）在 HTML 4 中推荐使用小写，而在未来 (X)HTML 版本中强制使用小写。
+1.4 HTML 属性
+	属性为 HTML 元素提供附加信息。
+	HTML 属性	<a href="http://www.w3school.com.cn">This is a link</a>
+		HTML 标签可以拥有属性。属性提供了有关 HTML 元素的更多的信息。
+		属性总是以名称/值对的形式出现，比如：name="value"。
+		属性总是在 HTML 元素的开始标签中规定。
+	HTML 提示：使用小写属性
+		属性和属性值对大小写不敏感。
+		不过，万维网联盟在其 HTML 4 推荐标准中推荐小写的属性/属性值。
+		而新版本的 (X)HTML 要求使用小写属性。
+	始终为属性值加引号
+		属性值应该始终被包括在引号内。双引号是最常用的，不过使用单引号也没有问题。
+		在某些个别的情况下，比如属性值本身就含有双引号，那么您必须使用单引号，例如：
+			name='Bill "HelloWorld" Gates'
+1.5 HTML 标题
+	HTML 标题
+		标题（Heading）是通过 <h1> - <h6> 等标签进行定义的。
+		<h1> 定义最大的标题。<h6> 定义最小的标题。
+	标题很重要
+		请确保将 HTML heading 标签只用于标题。不要仅仅是为了产生粗体或大号的文本而使用标题。
+		搜索引擎使用标题为您的网页的结构和内容编制索引。
+		因为用户可以通过标题来快速浏览您的网页，所以用标题来呈现文档结构是很重要的。
+		应该将 h1 用作主标题（最重要的），其后是 h2（次重要的），再其次是 h3，以此类推。
+	HTML 水平线
+		<hr /> 标签在 HTML 页面中创建水平线。
+		hr 元素可用于分隔内容。
+	HTML 注释
+		可以将注释插入 HTML 代码中，这样可以提高其可读性，使代码更易被人理解。浏览器会忽略注释，也不会显示它们。
+		<!-- This is a comment -->
+1.6 HTML 段落
+	HTML 段落 ： 段落是通过 <p> 标签定义的。
+	HTML 折行
+		如果您希望在不产生一个新段落的情况下进行换行（新行），请使用 <br /> 标签：<p>This is<br />a para<br />graph with line breaks</p>
+1.7 HTML 文本格式化
+	
+
+
+
+
+

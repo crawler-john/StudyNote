@@ -1,0 +1,75 @@
+{\rtf1\ansi\ansicpg936\cocoartf1187\cocoasubrtf370
+{\fonttbl\f0\fnil\fcharset134 STHeitiSC-Light;\f1\froman\fcharset0 Times-Roman;\f2\fnil\fcharset134 STSong;
+}
+{\colortbl;\red255\green255\blue255;\red38\green38\blue38;\red246\green246\blue246;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww10380\viewh7200\viewkind0
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
+
+\f0\fs24 \cf0 \
+\
+TFTP\'b7\'fe\'ce\'f1\'c6\'f7\'c5\'e4\'d6\'c3\'a3\'ba\
+
+\f1\fs28 \cf2 \cb3 1
+\f2 \'a1\'a2\'b0\'b2\'d7\'b0\'cf\'e0\'b9\'d8\'c8\'ed\'bc\'fe\'b0\'fc\'a3\'ba
+\f1 tftp
+\f2 \'a3\'a8\'b7\'fe\'ce\'f1\'b6\'cb\'a3\'a9\'a3\'ac
+\f1 tftp
+\f2 \'a3\'a8\'bf\'cd\'bb\'a7\'b6\'cb\'a3\'a9\'a3\'ac
+\f1 xinetd\
+\pard\pardeftab720\fi560\sa200
+\cf2 sudo apt-get install tftpd tftp xinetd\
+2
+\f2 \'a1\'a2\'bd\'a8\'c1\'a2\'c5\'e4\'d6\'c3\'ce\'c4\'bc\'fe
+\f1 \uc0\u8232 
+\f2 \'d4\'da
+\f1 /etc/xinetd.d/
+\f2 \'cf\'c2\'bd\'a8\'c1\'a2\'d2\'bb\'b8\'f6\'c5\'e4\'d6\'c3\'ce\'c4\'bc\'fe
+\f1 tftp\uc0\u8232 sudo vi tftp\u8232 
+\f2 \'d4\'da\'ce\'c4\'bc\'fe\'d6\'d0\'ca\'e4\'c8\'eb\'d2\'d4\'cf\'c2\'c4\'da\'c8\'dd\'a3\'ba
+\f1 \uc0\u8232 service tftp\u8232 \{socket_type = dgram\u8232 protocol = udp\u8232 wait = yes\u8232 user = root\u8232 server = /usr/sbin/in.tftpd\u8232 server_args = -s /tftpboot\u8232 disable = no\u8232 per_source = 11\u8232 cps = 100 2\u8232 flags = IPv4\}\u8232 
+\f2 \'b1\'a3\'b4\'e6\'cd\'cb\'b3\'f6
+\f1 \
+3
+\f2 \'a1\'a2\'bd\'a8\'c1\'a2
+\f1 tftp
+\f2 \'b7\'fe\'ce\'f1\'ce\'c4\'bc\'fe\'c4\'bf\'c2\'bc\'a3\'a8\'c9\'cf\'b4\'ab\'ce\'c4\'bc\'fe\'d3\'eb\'cf\'c2\'d4\'d8\'ce\'c4\'bc\'fe\'b5\'c4\'ce\'bb\'d6\'c3\'a3\'a9\'a3\'ac\'b2\'a2\'c7\'d2\'b8\'fc\'b8\'c4\'c6\'e4\'c8\'a8\'cf\'de
+\f1 \uc0\u8232 sudo mkdir /tftpboot\u8232 sudo chmod 777 /tftpboot -R\
+4
+\f2 \'a1\'a2\'d6\'d8\'d0\'c2\'c6\'f4\'b6\'af\'b7\'fe\'ce\'f1
+\f1 \uc0\u8232 sudo /etc/init.d/xinetd restart\u8232 
+\f2 \'d6\'c1\'b4\'cb
+\f1 tftp
+\f2 \'b7\'fe\'ce\'f1\'d2\'d1\'be\'ad\'b0\'b2\'d7\'b0\'cd\'ea\'b3\'c9\'c1\'cb\'a3\'ac\'cf\'c2\'c3\'e6\'bf\'c9\'d2\'d4\'b6\'d4\'c6\'e4\'bd\'f8\'d0\'d0\'d2\'bb\'cf\'c2\'b2\'e2\'ca\'d4\'a1\'a3\'a3\'a8\'bc\'d9\'c9\'e8\'d4\'da\'b5\'b1\'c7\'b0\'c4\'bf\'c2\'bc\'cf\'c2\'d3\'d0\'d2\'bb\'b8\'f6\'b2\'e2\'ca\'d4\'ce\'c4\'bc\'fe
+\f1 test.txt
+\f2 \'a3\'a9
+\f1 \uc0\u8232 $tftp 127.0.0.1\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 \u8232 tftp> put test.txt\u8232 Sent 1018 bytes in 0.0 seconds\u8232 tftp> get test.txt\u8232 Received 1018 bytes in 0.1 seconds\u8232 tftp> quit\
+
+\f2 \'cd\'a8\'b9\'fd
+\f1 put
+\f2 \'c3\'fc\'c1\'ee\'a3\'ac\'bf\'c9\'d2\'d4\'b0\'d1\'b5\'b1\'c7\'b0\'c4\'bf\'c2\'bc\'cf\'c2\'b5\'c4
+\f1 test.txt
+\f2 \'ce\'c4\'bc\'fe\'a3\'ac\'cd\'a8\'b9\'fd
+\f1 Ubuntu tftp
+\f2 \'c9\'cf\'b4\'ab\'b5\'bd\'cb\'fc\'b5\'c4\'b7\'fe\'ce\'f1\'ce\'c4\'bc\'fe\'c4\'bf\'c2\'bc\'a1\'a3\'d5\'e2\'ca\'b1\'a3\'ac\'d4\'da
+\f1 /tftpboot
+\f2 \'cf\'c2\'c3\'e6\'bb\'e1\'b3\'f6\'cf\'d6
+\f1 test.txt
+\f2 \'ce\'c4\'bc\'fe\'a1\'a3\'cd\'a8\'b9\'fd
+\f1 get
+\f2 \'c3\'fc\'c1\'ee\'a3\'ac\'bf\'c9\'d2\'d4\'b4\'d3
+\f1 /tftpboot
+\f2 \'cf\'c2
+\f1 ,
+\f2 \'cf\'c2\'d4\'d8
+\f1 test.txt
+\f2 \'ce\'c4\'bc\'fe\'a1\'a3\'d5\'e2\'d1\'f9\'be\'cd\'d1\'e9\'d6\'a4\'c1\'cb
+\f1 tftp
+\f2 \'b7\'fe\'ce\'f1\'c5\'e4\'d6\'c3\'b5\'c4\'d5\'fd\'c8\'b7\'d0\'d4\'a1\'a3\'b5\'b1\'ce\'c4\'bc\'fe\'c9\'cf\'b4\'ab\'d3\'eb\'cf\'c2\'d4\'d8\'bd\'e1\'ca\'f8\'ba\'f3\'a3\'ac\'bf\'c9\'d2\'d4\'cd\'a8\'b9\'fd
+\f1 quit
+\f2 \'c3\'fc\'c1\'ee\'cd\'cb\'b3\'f6\'a1\'a3\'d1\'cf\'b8\'f1\'b0\'b4\'d5\'d5\'d2\'d4\'c9\'cf\'b2\'bd\'d6\'e8\'c5\'e4\'d6\'c3
+\f1 tftp
+\f2 \'b7\'fe\'ce\'f1\'a3\'ac\'d2\'bb\'b0\'e3\'b6\'bc\'bf\'c9\'d2\'d4\'b3\'c9\'b9\'a6\'a1\'a3\'c8\'e7\'b9\'fb\'b3\'f6\'cf\'d6\'ce\'de\'b7\'a8
+\f1 get
+\f2 \'bb\'f2\'d5\'df
+\f1 put
+\f2 \'b5\'c4\'ca\'b1\'ba\'f2\'a3\'ac\'bf\'c9\'d2\'d4\'b2\'e9\'bf\'b4\'d2\'bb\'cf\'c2\'b7\'c0\'bb\'f0\'c7\'bd\'ca\'c7\'b7\'f1\'b9\'d8\'b1\'d5}

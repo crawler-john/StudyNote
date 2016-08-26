@@ -1,0 +1,224 @@
+input子系统：
+handler->connect(handler, dev, id);
+1.
+evdev_connect：
+	evdev->handle.dev = input_get_device(dev);//硬件信息
+	evdev->handle.handler = handler;//软件信息
+调用input_register_handle：
+list_add_tail_rcu(&handle->d_node, &dev->h_list);
+//把input_handle添加到input_dev.h_list
+list_add_tail_rcu(&handle->h_node, &handler->h_list);
+//把input_handle添加到input_handler.h_list
+//以后通过input_dev或者input_handler都能找到对方
+
+2.软硬件建立连接之后，后续如何进行设备的访问
+read-->sys_read--->evdev_read
+//如果没有按键数据可读，则进入休眠
+wait_event_interruptible(evdev->wait,
+		client->head != client->tail || !evdev->exist);
+
+在哪个位置唤醒
+在evdev_event中实现唤醒
+evdev_event：
+wake_up_interruptible(&evdev->wait);
+
+如何在中断处理函数中调用evdev_event来实现唤醒
+调用input_event来实现休眠进程的唤醒和数据的传递
+input_event：
+  --->input_handle_event
+    --->input_pass_event
+	//通过input_dev.h_list取出input_handle
+	list_for_each_entry_rcu(handle, &dev->h_list, d_node)
+	//通过input_handle取出input_handler
+	handler = handle->handler;
+	//调用handler->event;
+	handler->event(handle, type, code, value);
+	//1.上报type, code, value到input_handler
+	//2.唤醒休眠的进程
+
+
+如何实现一个input子系统的驱动	
+1.分配input_dev
+struct input_dev *btn_dev = input_allocate_device();
+2.初始化input_dev
+struct input_dev{
+	.name = "dy_btn",
+	.evbit = 指定哪类事件
+	//同步类事件
+	#define EV_SYN			0x00
+	//按键事件
+	#define EV_KEY			0x01
+	//相对位移坐标事件
+	#define EV_REL			0x02
+	//绝对位移坐标事件
+	#define EV_ABS			0x03
+
+	.key_bit = 上报按键事件时一定要指定要上报的键值
+	//键值定义在input.h
+	.absbit = 上报绝对位移坐标
+	.....
+};
+3.向内核注册input_dev
+input_register_device:
+1）添加节点input_dev_list中
+2）遍历input_handler_list进行匹配
+匹配成功，内核帮你实现input_dev和input_handler之间的连接关系
+这样就获得了对硬件的操作方法evdev_fops
+
+4.注册中断处理函数
+5.申请GPIO
+....
+
+应用程序如何获取驱动上报的数据信息
+struct input_event {
+	struct timeval time;
+	//时间信息
+	__u16 type;
+	//事件类型
+	__u16 code;
+	//键值	坐标
+	__s32 value;
+	//按键状态(0:松开，1:按下)	
+};
+
+
+测试input类型的按键驱动
+cat /proc/interrupts	//查看中断信息
+cat /proc/bus/input/devices //查看输入设备的信息和设备节点
+
+I: Bus=0000 Vendor=0000 Product=0000 Version=0000
+N: Name=""
+P: Phys=
+S: Sysfs=/devices/virtual/input/input2
+U: Uniq=
+H: Handlers=event2 //对应的设备节点dev/event2
+B: EV=3
+B: KEY=3c
+
+测试方法1：cat /dev/event2
+测试方法2：hexdump /dev/event2
+
+命令头    时间      信息    事件类型 	键值 按键状态低位	高位
+0000000 0166 0000 9c58 000a 0001 	0002 0001 		0000
+//按键事件
+0000010 0166 0000 9c68 000a 0000 	0000 0000 		0000
+//同步事件
+0000020 0166 0000 47a4 000c 0001 	0002 0000 		0000
+0000030 0166 0000 47a9 000c 0000 	0000 0000 		0000
+测试方法3.写一个btn_test
+
+
+I2C总线：
+一主多从的通信协议
+主端：主设备(CPU)
+从端：从设备，挂载多个从设备
+主端和从端通过两根信号线连接
+SCL：时钟信号线，由主端控制
+SDA：数据信号线，主端从端都可以控制，当主端--->从端传输数据，主端控制，	     当从端--->主端传输数据，从端控制
+     CPU的主端应该配置成输入口，从端也可以配置成输入口,需要接上拉电阻，      时钟线也需要接上拉电阻
+
+SCL和SDA默认的电平状态是高(由于接了上拉电阻)
+
+主端和从端如何进行数据通信
+i2c协议：
+start信号:起始信号，由主设备发起，SCL保持高电平，SDA由高到低跳变
+stop信号：结束信号，由主设备发起，SCL保持高电平，SDA由低到高跳变
+从设备地址：区分不同的从设备，从设备地址由从设备的厂家和硬件连接共同决	定
+	at24cxx(eeprom,电可擦除存储器)：1010(A0)(A1)(A2)R/W,设备地址不	包含读写	位	1010000 = 0x50(真正的从设备地址)
+ACK信号：应答信号，SCL低电平有效，用来表示设备是都处于一个可交互的状态	，比如主设备给从设备发送设备地址后，从设备如果和地址匹配成功，	应该发送一个ACK信号
+
+I2C每次传输1字节数据
+
+主设备和从设备如何通过SCL和SDA完成数据交互
+1）主设备发送start信号
+2）主设备发送从设备地址(确定具体要访问的从设备)
+3）主设备在发送设备地址的同时，还发送了一个读/写信号
+4）如多对应的从设备存在,那么必须给主设备发送一个应答信号
+5）根据从设备的操作要求完成读写
+6）数据交互完毕,主设备要发送STOP信号
+
+SCL和数据线如何进行搭配使用
+当SCL保持高电平时，SDA应该保持不变
+如果SCL为低电平，我们能够对SDA上的数据进行修改
+
+I2C的应用领域：PMIC(电源管理芯片)，各种传感器，摄像头，触摸屏芯片
+
+1）S5PV210内部集成了I2C控制器，I2C总线上进行数据交互时，所有的时序要求，都可以通过控制器来进行控制，不需要手动配置
+2）控制时序有些事固定的，有些是变化的
+固定：start stop ACK R/W
+可变：设备地址，具体I2C从设备的操作方法
+这些可变的信息都来自于I2C的从设备
+3）只需要将可变的额外信息告诉I2C控制器即可，开启控制后就能完成所需的数据传输
+
+基于以上3点，内核实现了I2C驱动：
+I2C总线驱动：
+	管理的硬件对象是I2C控制器，关心如何进行数据传输，而不关心数据的		具体含义，数据的传输依靠I2C总线驱动。I2C设备驱动只需要将要操作		的数据提交给I2C总线驱动即可
+
+内核的I2C驱动框架：
+	对上app:open read write ioctl.......接口
+	-------------------------------------
+	I2C设备驱动：关心数据的具体含义，不关心数据如何进行传输
+	eeprom_open.................
+	--------------------------------------
+	内核提供统一的方法实现总线驱动和设备驱动之间的数据交互：
+	i2c_transfer();//老式接口
+	SMBUS接口(提供了一组函数);//新式接口
+	新式接口兼容老式接口
+	------------------------------------
+	I2C总线驱动：关心如何进行数据传输，而不关心数据的	具体含义，
+	------------------------------------
+	I2C控制器<--------->从设备
+
+
+如何实现一个i2c从设备驱动？
+	I2C设备驱动也采用平台设备总线驱动模型
+	内核帮你定义了一条虚拟总线i2c_bus_type
+	总线上维护两个链表：dev链表，drv链表
+	dev链表中的每一个节点对应数据结构i2c_client,存放硬件信息
+	drv链表中的每一个节点对应数据结构i2c_driver,纯软件信息
+
+每当向dev链表或者drv链表添加节点时，
+	1.添加节点到各自的链表中
+	2.遍历对方的链表，去除每一个节点，进行匹配
+	  拿i2c_client.name和i2c_driver.id_table->name进行比较，如果匹	  配成功，调用i2c_driver.probe函数，把匹配成功的i2c_client结构	  的地址传递给该函数，probe函数做什么由开发者决定
+
+如何使用i2c_client和i2c_driver
+i2c_driver？
+	1）分配i2c_driver
+	2)初始化i2c_driver
+struct i2c_driver eeprom_drv = {
+	.id_table = 名字一定要有
+	.probe = 匹配成功调用的函数
+	.remove = 删除时调用
+};
+	3)调用i2c_add_driver注册
+
+i2c_client?
+	i2c_client的分配，初始化，注册都是由内核实现，你只需要对		i2c_board_info进行分配初始化注册即可
+	内核根据i2c_board_info区填充i2c_client的信息
+	
+i2c_client的使用就放在i2c_board_info结构体中
+	1.打开开发板文件arch/arm/mach-s5pv210/mach-dy210.c
+	2.在文件中添加i2c_board_info的分配和初始化
+1218 static struct i2c_board_info eeprom[] = {
+1219     {
+1220         I2C_BOARD_INFO("at24cxx", 0x50),
+1221     },//at24cxx最终会赋值给i2c_client.name
+1222 };	   //0x50最终赋值给i2c_client.addr
+	3.必须在平台代码mach-dy210.c的初始化函数
+	.init_machine   = smdkc110_machine_init
+	中注册分配初始化好的i2c_board_info
+1547     i2c_register_board_info(0, eeprom, ARRAY_SIZE(eeprom));
+	第一个参数：总线编号，看从设备关在在哪条总线上
+		S5PV210	有4条I2C总线，at24c02挂载在i2c0总线上
+	第二个参数：从设备的硬件信息
+	第三个参数：从设备硬件的个数
+	make zImage重新编译内核
+
+编写i2c_driver的驱动代码at24cxx_drv.c
+
+测试程序
+./a.out w addr data
+./a.out r addr
+
+	

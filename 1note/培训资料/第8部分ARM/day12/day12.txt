@@ -1,0 +1,234 @@
+1.linux设备驱动的分类
+按照管理的硬件来分
+字符设备
+	按字节流访问，能够顺序访问，按位置访问也是允许的
+	按键，串口，中断，LCD，触摸屏
+块设备
+	在Unix系统下，块设备按一定的数据块进行访问，
+	在linux下，块设备既可以按数据块访问，也可以按字节流访问，他和字	符设备驱动的本质区别在于linux操作系统描述字符设备和块设备的操作	方法是不一样的
+	硬盘，U盘，SD卡，TF卡，nand flash,nor flash,one nand
+网络设备
+	网络设备的驱动一定要结合TCP/IP协议来实现
+	网卡
+
+2.字符设备驱动
+驱动程序的作用：
+	1）对下管理操作硬件
+	2）对上提供访问操作硬件的方法(接口)
+		led_on...
+		uart_putc....
+linux中应用程序如何访问硬件？
+在linux下，一切皆文件，硬件设备会以设备文件的形式存在,设备文件在/dev/,那么应用程序访问硬件其实就是访问设备文件
+
+应用程序如何访问设备文件？
+访问设备文件的方法和访问普通文件一样，可以通过相应的系统调用函数来访问
+open,read,write,ioctl,mmap,close.......
+
+设备文件如何找到对应的驱动程序？
+设备文件本身包含一些属性，字符设备(c)，块设备(b),还包括主设备号和次设备号这两个重要的属性
+应用程序就是根据主设备号找到对应的驱动程序，一个驱动只有一个主设备号
+次设备号用来区分使用同一驱动的不同设备个体
+开发板2个串口，他们共享驱动程序,主设备号是一样的，但是次设备号不一样，用区分这两者
+
+设备号：主设备号和次设备号
+数据类型：
+	dev_t(unsigned int)
+	高12位:主设备号
+	低20位:次设备号
+操作宏：
+	MAJOR	
+	MINOR
+	MKDEV
+驱动程序需要绑定一个设备号，首先需要向内核申请设备号资源，只有申请成功后，才能进行绑定
+
+如何向内核申请设备号？
+静态分配和动态分配
+静态分配：
+	1.首先确认申请的主设备号未被使用，
+	通过cat /proc/devices查看哪个设备号未被使用
+Character devices:
+  1 mem
+  5 /dev/tty
+  5 /dev/console
+  5 /dev/ptmx
+ 10 misc
+ 13 input
+ 21 sg
+ 29 fb
+ 81 video4linux
+ 89 i2c
+ 90 mtd
+116 alsa
+128 ptm
+136 pts
+204 s3c2410_serial
+252 s3c_bc
+253 pvrsrvkm
+254 rtc
+
+Block devices:
+  1 ramdisk
+259 blkext
+  7 loop
+  8 sd
+ 31 mtdblock
+ 65 sd
+ 66 sd
+ 67 sd
+ 68 sd
+ 69 sd
+ 70 sd
+ 71 sd
+128 sd
+129 sd
+130 sd
+131 sd
+132 sd
+133 sd
+134 sd
+135 sd
+179 mmc
+
+2.根据你的设备个数分配次设备号
+如果设备个数只有一个,一般次设备号从0开始
+dev_t dev = MKDEV(主设备号,次设备号)
+
+3.调用register_chrdev_region,向内核申请即可
+
+4.如果主设备号为0，静态分配失败
+
+动态分配：
+1.调用alloc_chrdev_region直接去申请设备号,也就是让操作系统内核帮你分配设备号
+
+释放设备号:
+unregister_chrdev_region将设备号归还给操作系统
+
+
+linux驱动程序重要的4个数据结构
+1.struct file
+作用:描述文件打开以后的状态属性
+生命周期:成功打开文件时由内核创建
+	 关闭文件时进行销毁
+重要的成员:
+struct file {
+	...
+	const struct file_operations	*f_op;
+	//指向驱动程序中的各个硬件的操作方法
+	unsigned int 		f_flags;
+	//文件的操作属性
+	loff_t			f_pos;
+	//文件的操作位置
+	void			*private_data;
+	//私有数据？
+	....
+};
+
+2.struct file_operations
+//操作函数集合
+struct file_operations
+{
+	struct module *owner;
+	.....
+};
+
+3.struct inode
+作用:描述一个文件的物理属性
+生命周期:文件存在，内核创建
+	 文件销毁，内核销毁对应的inode
+重要的数据成员:
+struct inode {
+	......
+	dev_t			i_rdev;
+	//存放设备号
+	......
+	struct cdev		*i_cdev;
+	//字符设备结构，指向一个字符设备
+	.....
+};
+
+4.struct cdev
+struct cdev {
+	struct kobject kobj;
+	struct module *owner;
+	const struct file_operations *ops;
+	struct list_head list;
+	dev_t dev;
+	unsigned int count;
+};
+
+一个文件可以有多个file,一定只有一个inode
+
+如何关联struct file和struct file_operations
+1.应用程序调用open,最终会调用sys_open
+2.sys_open创建file结构，描述文件打开的信息
+3.通过某种机制<?>获取驱动中的file_operations
+然后将驱动中的file_operations的地址赋值给struct file中的f_op;
+4.sys_open最终会调用驱动中的file_operations里的open函数
+	
+对于设备的访问总是先open,使file和底层驱动的file_operations进行关联
+read/write/....
+read-->sys_read-->file->f_op->read = led_read
+.....
+
+如何将驱动程序的file_operations注册到内核中
+
+struct cdev
+
+1.如何编写安装字符设备驱动程序
+1)分配初始化file_operations
+struct file_operations cdd_fops = 
+{
+	.open = cdd_open,
+	.release = cdd_close,
+	.read = cdd_read,
+	.....
+};
+
+2)分配初始化cdev
+struct cdev cdd_cdev;
+cdev_init(&cdd_cdev,&cdd_fops);
+//实现cdd_cdev->fops = cdd_fops;
+cdev_add(&cdd_cdev,设备号,设备个数);
+//就是将cdd_cdev添加到内核的cdev数组中，以次设备号为下标
+一旦完成了cdev的注册，相当于内核中有了一个新的字符设备,也就是说该字符设备有了操作函数集合
+
+
+2.应用程序先要open打开设备
+open->sys_open
+sys_open：
+1.根据inode.irdev获取设备号
+2.根据设备号在内核的cdev数组中找到对应的字符设备驱动cdev(cdd_cdev)
+3.然后将找到的cdev的地址赋值给inode.i_cdev
+4.创建file
+5.从已经获得的cdev中取出驱动操作函数集合ops(cdd_fops)
+6.把字符设备操作集合赋值给file->f_ops = &cdd_fops
+7.最后调用file->f_op->open = cdd_open
+
+动态创建设备文件
+class_create
+device_create
+
+字符设备驱动框架
+1.申请设备号
+2.注册cdev(初始化cdev的操作函数集合)
+3.注册设备类
+4,注册设备文件
+
+
+linux内核中关于GPIO的操作函数
+gpio_request
+gpio_direction_output
+gpio_direction_input
+s3c_gpio_setpull
+gpio_set_value
+gpio_get_value
+gpio_free
+
+linux内核中关于物理地址映射的函数
+linux中不允许直接访问物理地址，一定要访问物理地址可以使用地址映射
+ioremap
+iounmap
+
+
+
+

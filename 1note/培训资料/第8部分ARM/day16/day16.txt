@@ -1,0 +1,219 @@
+一.linux内核内存管理
+1.linux内核在启动时，会为每一个物理页分配一个struct page,也就是一看到page结构体，一定代表一个物理地址，而不是虚拟页
+2.虚拟地址的好处
+3.虚拟地址的划分：
+	用户空间：0x00000000----0xbfffffff	0-3G
+	内核空间：0xc0000000----0xffffffff	3-4G
+	用户空间和内核空间只允许访问虚拟地址，不允许访问物理地址
+4.MMU
+	1）将虚拟地址转换成物理地址	
+	2）会检查对地址访问的权限
+	3）控制cache等等
+	uclinux-不带MMU
+5.内核虚拟地址(1G)在内核初始化时就应经和对应的物理地址建立映射关系，但是用户的虚拟地址没有这么做，需要动态建立到物理地址的映射
+
+6.如果物理内存大于1G，如见建立映射？
+这是我们会对内核的1G的虚拟地址进行划分
+X86：
+	低端内存(直接内存映射区)
+	存在一个物理地址到虚拟地址的线性关系
+	虚拟地址 = 0xc0000000 + (物理地址-物理地址的起始地址)
+	内核一般处于这个区域
+	高端内存：起始地址由物理内存的大小决定
+		动态内存映射区
+		永久内存映射区
+		固定内存映射区
+
+ARM：
+
+[    0.000000] Virtual kernel memory layout:
+[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+[    0.000000]     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
+[    0.000000]     DMA     : 0xff000000 - 0xffe00000   (  14 MB)
+[    0.000000]     vmalloc : 0xe0800000 - 0xfc000000   ( 440 MB)
+[    0.000000]     lowmem  : 0xc0000000 - 0xe0000000   ( 512 MB)
+//低端内存
+[    0.000000]     modules : 0xbf000000 - 0xc0000000   (  16 MB)
+[    0.000000]       .init : 0xc0008000 - 0xc0031000   ( 164 kB)
+[    0.000000]       .text : 0xc0031000 - 0xc058a000   (5476 kB)
+[    0.000000]       .data : 0xc058a000 - 0xc05cbf20   ( 264 kB)
+
+7.内核内存分配的函数
+kmalloc/kfree
+__get_free_pages/free_pages
+都是分配在低端内存，物理上一定是连续的，虚拟也连续
+vmalloc/vfree（默认在动态内存映射区）
+虚拟上连续，物理上不一定连续
+
+如果要访问物理地址，可以在内核中将物理地址映射成虚拟地址
+ioremap
+iounmap
+
+
+二.LCD驱动
+1.在内核中操作LCD起始就是操作对应的显存
+帧缓冲设备
+2.linux内核中framebuffer驱动框架
+
+app:open read write ioctl mmap.....
+------------------------------------
+framebuffer核心层：/drivers/video/fbmem.c
+1.对上提供统一的访问接口
+2.对下提供统一注册硬件的方法和对应的数据结构
+------------------------------------------
+设备驱动(显存和LCD控制器)
+
+核心层中关于对上的接口是怎么样的？
+核心层中个底层驱动提供的注册函数和对应的数据结构是怎么样的？
+
+fbmem.c
+subsys_initcall(fbmem_init);
+fbmem_init：
+//注册一个字符设备驱动，并且给用户提供访问接口fb_fops
+register_chrdev(FB_MAJOR,"fb",&fb_fops)
+//注册设备类
+fb_class = class_create(THIS_MODULE, "graphics");
+
+打开
+open--->fb_open:
+	int fbidx = iminor(inode);
+	struct fb_info *info;
+	//以次设备号为索引,在数组中取出一项fb_info
+	info = registered_fb[fbidx];
+	//调用取出的fb_info中的fb_open函数
+	info->fbops->fb_open
+
+读
+read--->fd_read:
+	int fbidx = iminor(inode);
+	struct fb_info *info = registered_fb[fbidx];
+	//如果fb_info有fb_read读显存的方法，则调用此函数
+	if (info->fbops->fb_read)
+		return info->fbops->fb_read(info, buf, count, ppos);
+	//如果没有，内核实现一个读显存的方法
+	//从fb_info中获得屏幕大小的信息
+	total_size = info->screen_size;
+	//或者从fb_info.fix中获取显存的大小
+	total_size = info->fix.smem_len;
+	//分配内核缓冲区
+	count = total_size;
+	buffer = kmalloc(count);
+	//从fb_info中获得显存的内虚拟起始地址
+	src = (u32 __iomem *) (info->screen_base );
+	
+	while (count) {
+		//从显存中拷贝数据到内核缓冲区
+		dst = buffer;
+		*dst++ = fb_readl(src++);
+		//从内核缓冲区拷贝数据到用户缓冲区
+		copy_to_user(buf, buffer, c)
+	}
+映射	
+mmap---->fb_mmap:
+	int fbidx = iminor(file->f_path.dentry->d_inode);
+	struct fb_info *info = registered_fb[fbidx];
+
+	//从fb_info中获取显存的物理起始地址
+	start = info->fix.smem_start;
+	off += start;
+	//内核将显存的物理地址映射到用户空间的某一个虚拟地址
+	//用户访问mmap的返回值，就是在访问显存
+	if (io_remap_pfn_range(vma, vma->vm_start, off >> PAGE_SHIFT,
+			     vma->vm_end - vma->vm_start, 						vma->vm_page_prot))
+		return -EAGAIN;
+
+
+ioctl---->fd_ioctl:
+	int fbidx = iminor(inode);
+	struct fb_info *info = registered_fb[fbidx];
+	
+fd_ioctl---->do_fb_ioctl:
+	//屏幕的可变参数信息
+	struct fb_var_screeninfo var;
+	//屏幕的固定参数信息
+	struct fb_fix_screeninfo fix;
+
+	switch (cmd) {
+		case FBIOGET_VSCREENINFO:
+		var = info->var;
+		//将屏幕的可变参数信息上报到用户空间
+		copy_to_user(argp, &var, sizeof(var));
+		break;
+
+		case FBIOGET_FSCREENINFO:
+		fix = info->fix;
+		//将屏幕的固定参数信息上报到用户空间
+		copy_to_user(argp, &fix, sizeof(fix)); 
+	}
+		
+总结：framebuffer的对上接口的实现严重依赖于fb_info结构体，该结构体来自于registered_fb数组。
+
+fb_info是何时被添加到该数组中
+int
+register_framebuffer(struct fb_info *fb_info)
+{
+	//从数组中找一项空项
+	for (i = 0 ; i < FB_MAX; i++)
+		if (!registered_fb[i])
+			break;
+	//创建设备节点，主设备号29，次设备号i,设备文件名fbi
+	//fb0,fb1,fb2............
+	device_create(fb_class, fb_info->device,
+				MKDEV(FB_MAJOR, i), NULL, "fb%d", i);
+	//填充fb_info到数组中，供应用程序和核心层来使用
+	registered_fb[i] = fb_info;
+}
+
+
+如何实现一个LCD的驱动？
+1.分配fb_info
+2.初始化fb_info
+	指定显存的物理起始地址
+	指定显存的内核虚拟起始地址
+	指定显存的大小
+	指定显存的可变参数信息
+	指定显存的固定参数信息
+	......
+3.调用register_framebuffer注册fb_info到核心层，供核心层和用户空间来访问显存
+
+4.LCD控制器的初始化
+寄存器的地址映射
+寄存器参数配置
+
+LCD控制器和LCD面板之间的硬件特性
+VD0-VD23:24根数据线，用来传输RGB
+VSYNC：垂直同步信号，控制写一帧的信号
+HSYNC：水平同步信号，控制写一行的信号
+VCLK：像素时钟信号，控制写一个像素点的信号，每一个时钟周期，写一个像素点
+VDEN：数据使能信号
+
+LCD控制器和LCD面板的时间参数配置
+VSPW+1：VSYNC的脉冲宽度
+	VSPW+1 = tvpw = 10(1-20)
+	VSPW = 9
+VBPD+1：表示发送完VSYNC到数据使能的时间
+	VBPD+1 = tvb - tvpw = 23 - 10
+	VBPD = 12
+VFPD+1:表示写完一帧到开始下一帧的时间间隔
+	VFPD+1 = tvfp = 22
+	VFPD = 21
+
+HSPW+1:HSYNC的脉冲宽度
+	HSPW+1 = thpw = 20(1-40)
+	HSPW = 19
+HBPD+1：表示发送完HSYNC后到数据使能的时间
+	HBPD+1 = thb - thpw = 46 - 20
+	HBPD = 25
+HFPD+1：表示写完一行到开始下一行的时间间隔
+	HFPD+1 = thfp = 210
+	HFPD = 209
+
+这些参数来自于LCD面板的说明手册
+一旦以上的参数确定，就可以将这些参数写入LCD控制器对应的寄存器中，LCD控制器就会按照这样的时序来操作LCD面板
+
+如果CPU没有更换，只是换了LCD面板，只需要修改这些时序参数即可
+
+
+
+
+

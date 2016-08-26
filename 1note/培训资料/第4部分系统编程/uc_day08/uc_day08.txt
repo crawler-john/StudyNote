@@ -1,0 +1,204 @@
+一.信号屏蔽
+	信号不确定什么时候会到来,因此有可能在非常重要的场合(执行关键代码)信号到来，此时有可能产生重大的错误。程序无法阻止信号的到来,但是可以屏蔽信号,就是信号到来暂时不作处理,等关键代码执行完毕，解除信号屏蔽后再做处理
+
+信号屏蔽/解除函数
+ int sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
+参数：
+	how就是信号屏蔽的方式，包括
+	SIG_BLOCK - 相当于旧的屏蔽 + 新的屏蔽
+		A B C + C E F = A B C E F
+	SIG_UNBLOCK - 相当于旧的屏蔽 - 新的屏蔽
+		A B C - C E F = A B
+	SIG_SETMASK - 无视旧的，直接替换成新的
+		set是新的信号集屏蔽字
+		oldset是一个传出参数，可以传出旧的信号集屏蔽字，用于恢		复之前的屏蔽
+	注意：	信号屏蔽后一定要解除屏蔽
+		一般情况下,how都用SIG_SETMASK
+		信号9屏蔽无效
+
+函数sigpending()可以判断在信号屏蔽期间，有没有信号来过,功能就是把信号屏蔽期间来过的信号放入信号集
+
+(了解)sigaction()也是一个信号处理方式的注册函数，是signal()的增强版，sigaction()可以拿到更多的信号信息,甚至可以在发送信号的时候附带其他数据,sigaction()中信号的处理函数支持2种格式，signal()的格式和更加复杂的格式
+int sigaction(int signum, const struct sigaction *act,
+                     struct sigaction *oldact);
+
+C语言中，结构体里面可以写函数吗？
+不可以,但是C++可以
+
+C语言中，结构体中需要函数，可以使用函数指针做成员
+
+计时器
+linux中每个进程都有三种计时器：真实计时器，虚拟计时器，实用计时器。
+其中真实计时器是由SIGALRM工作,计时器可以用setitimer()进行设置
+	
+int setitimer(int which, const struct itimerval *new_value,
+                     struct itimerval *old_value);
+参数which表示选择哪种定时器，一般都是真实定时器
+struct itimerval 设置计时器的开始时间和间隔时间
+
+
+二.进程间通信 - IPC
+Unix/linux系统是基于多进程,进程与进程之间经常需要进行数据交互，这种技术就叫进程间通信
+常见的IPC：
+1.文件
+2.信号
+3.管道
+4.共享内存
+5.消息队列
+6.信号量集
+7.网络编程中的socket
+....
+
+管道是最古老的IPC之一,目前较少使用,共享内存，消息队列和信号量集都遵循相同的规范，在编程上有很多共同点，这三个统称XSI IPC
+
+管道(pipe) - 就是用管道文件最为媒介的IPC，管道文件是一种特殊的文件，ls - l时，文件类型为p
+
+mkfifo 命令/函数 管道文件名  就可以创建管道文件，touch命令，open函数都无法创建管道文件
+
+管道文件只是交互的媒介，不存储任何数据，只有在进程读和有进程写时才能畅通，否则阻塞
+
+管道有2种用法：有名管道和无名管道
+有名管道可以用于所有进程之间的通信，而无名管道只能用于fork()创建的父子进程之间的通信
+
+有名管道就是程序员创建管道文件进行IPC，无名管道系统创建和维护的管道文件进程IPC
+
+有名管道的用法
+1.用mkfifo创建管道文件
+2.想读写普通文件一样操作管道文件
+3.如果不再使用管道文件，可以删除
+
+练习：使用有名管道a.pipe实现pipea.c和pipab.c之间的IPC，pipea发送100个整数给pipeb
+打开管道文件要用只读方式和只写方式
+
+unlink()可以删除文件
+
+
+XSI IPC包括共享内存，消息队列和信号量集，他们遵循相同的规范，编程有很多相似之处
+
+做标准
+
+做产品
+
+做项目
+
+XSI IPC的通用规范:
+1.所有的IPC结构都有一个内部的ID作为唯一标识
+2.内部ID的获取需要借助外部的key,类型key_t
+3.key的获取有三种方式
+	a.使用IPC_PRIVATE做key,但是这种方式外部无法获取，只能内部使用
+	b.使用ftok()提供一个key
+	c.在头文件中统一定义所有的key
+4.用key获取内部id的函数都是xxxget()，比如shmget(),msgget()
+5.每种IPC都提供一个xxxctl()函数,这个函数的功能至少包括
+查询，修改和删除
+其中一定有一个cmd的参数，值：
+IPC_STAT - 查询
+IPC_SET - 修改
+IPC_RMID - 按ID删除IPC结构
+6.所有的IPC结构都由内核管理，不使用时需要手动删除
+7.IPC结构的相关命令
+ipcs - 查询当前的ipc结构
+ipcrm - 删除当前的IPC结构(按ID删除)
+选项：
+-a  所有的IPC结构
+-m  共享内存
+-q  消息队列
+-s  信号量集
+
+
+三.共享内存
+	以一块共享的物理内存作为媒介，通常情况下，两个进程无法直接映射相同的内存，共享的实现：
+1.内核先拿出一块内存，内核负责管理
+2.允许所有进程对这块内存进行映射
+3.这样两个不同的进程就可以映射到相同的物理内存上，从而实现信息的交互，共享内存是效率最高的IPC
+编程步骤：
+1.获取key,用ftok()或者头文件定义
+2.使用shmget()创建/获取内部ID
+3.使用shmat()挂载(映射)共享内存
+4.可以像正常操作一样使用共享内存
+5.使用shmdt()卸载(解除映射)共享内存
+6.如果确定不再使用，可以使用shmctl()函数删除共享内存
+
+key_t ftok(const char *pathname, int proj_id);
+参数：
+	pathname是一个真实的可访问的路径
+	proj_id是项目编号，低8位有效(1-255)
+返回值：
+	key
+
+ftok()函数如果给定的路径有效，不会出错，会按照路径和项目ID生成一个key，相同的路径+相同的项目ID生成相同的key
+
+int shmget(key_t key, size_t size, int shmflg);
+参数：
+	key就是ftok的返回值，外部的key
+	size就是共享内存的大小
+	flag在获取时为0，在新建时用IPC_CREAT|0666(权限)
+返回值：
+	成功返回共享内存id,失败返回-1
+
+ void *shmat(int shmid, 0, 0);//挂载
+
+int shmdt(const void *shmaddr);//卸载
+//shmaddr就是shmat的返回值
+
+shmctl()可以查询，修改，删除共享内存
+	查询时，会把共享内存的信息放入第三个参数
+	修改时，只有用户id,组id和权限可以修改
+	删除时，第三个参数给0
+
+删除共享内存时，挂载数位0才真正删除，否则只是做一个删除标记，当挂载数位0时真正删除
+
+练习：写一个shmb.c,从共享内存中取出10
+
+共享内存虽然速度最快,但多个进程同时写数据,会发生互相覆盖,导致数据混乱。
+
+
+消息队列
+消息队列可以解决多个进程同时写数据的问题
+消息队列就是存放消息的队列。队列是线性的数据结构,先入先出(fifo),一般情况下，队列有满有空，数据先封入消息中，然后再把消息存入队列
+
+消息队列编程步骤：
+1.得到外部的key,ftok()函数
+2.用key创建/获取一个队列(消息队列),函数msgget()
+3.把数据/消息 存入队列或者从队列中取出
+函数msgsnd()存入/msgrcv()取出
+4.如果不再使用消息队列可以使用msgctl()删除
+
+msgget()，msgctl()和共享内存的函数类似
+int msgget(key_t key, int msgflg);
+int msgctl(int msqid, int cmd, struct msqid_ds *buf);
+
+int msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg);
+参数：
+	msqid就是消息队列的ID
+	msgp是消息的首地址，其中消息又分为有类型消息和无类型消息，更规		范的是有类型消息。有类型的消息就是一个结构
+		struct msgbuf {//结构名可以自定义
+               long mtype;//消息的类型，必须大于0
+               char mtext[1];//数据区域，可以随便写
+           	};
+		将来在接收消息时，可以按照类型有选择地接收消息
+	msgsz是数据区域的大小,不包括mtype(有些时候也包括)
+	msgflag就是选项，可以是0代表阻塞(队列满了等待)，也可以是			IPC_NOWAIT代表非阻塞(队列满了直接返回错误)
+返回值：
+	成功返回0，失败返回-1
+
+ssize_t msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp,
+                      int msgflg);
+参数：
+	前三个参数和msgsnd()一样
+	参数msgflag也和msgsnd()一样
+	参数msgtyp可以让接受者有选择地接收消息，值可能是：
+		0  - 接收任何类型的消息(第一个，先进先出)
+		>0 - 接受类型为msgtyp类型的消息
+		<0 - 接收类型小于等于msgtyp绝对值的消息，从小到大接收
+返回值：
+	成功返回接收到的数据大小，失败返回-1
+
+练习：写msgb.c,把hello从消息队列中读出来并打印	 
+
+	
+
+
+
+
+

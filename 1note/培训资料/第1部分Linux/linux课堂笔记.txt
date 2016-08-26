@@ -1,0 +1,572 @@
+1.硬盘表示方法
+	1 主分区和扩展分区不能多于4个（<=），主分区不可少。扩展分区不能超过1个。
+	2 扩展分区不能直接使用，需要再分成逻辑分区，逻辑分区在理论数量上没有限制。
+	3.Window 采用文件挂在盘符下面，而linux下采用分区挂在文件下。
+	4.hd/(sd)a(bcd)1(123456) hd 表示 IDE, sd 表示SCSI, 字母a 表示第一块硬盘 ,b 表示第二块 依次类推。
+	1234 分别表示第1到第4块主分区/扩展分区，5-6分别表示第1-第2块逻辑分区。
+2.关于发行版：
+	1 查看内核版本
+	uname -r
+	cat /proc/version
+	
+##################################################################################
+1.	ls
+	ls -l //ll
+	ls -a  
+	ls -la
+	ls -la /home
+
+2	pwd
+
+3	cd 
+	cd /home
+	
+4.文件的创建 删除 touch aa.c  rm -rf aa.c
+  文件夹创建 删除 mkdir dir   rm-rf dir   rmdir dir(empty dir)
+  文件的拷贝 剪切 cp aa.c ./dir    mv aa.c  ./dir
+  r -- recursive 表示递归，f --force 表示强制册除
+  如何拷贝剪切文件夹
+  cp -r folder1 folder2
+  mv folder1 folder2
+4.5 .. 表示上一级目录
+		cd /usr/share/vim 
+		cd ..
+		/usr/share
+		cd ..
+		/usr
+		cd ..
+		/
+	.表示当前目录(当前目录可以省略)
+		cd ./myself  cd myself
+  
+5.vim必会的常用命令
+	0.gedit /usr/share/vim/vim70/tutor/tutor.zh.euc
+	1.q q! wq 
+	2.dd 2dd p
+	  yy nyy p    //copy
+	3.x
+	4.dw d$(shift + d)
+	5.cw c$(shift + c)
+	7. /find
+	8. :s/old/new/g 
+	   :#,#s/old/new/g
+	   :%s/old/new/g
+	9. i, a , A, o, O
+	10  r R(exit esc) 
+	11 u U ctrl + R
+  
+6.如何设置vim的行号，tablespace
+  1.cd             //回家目录
+  2.vim .vimrc
+  3.set nu
+    set ts=4
+	set ai
+7.相对路径和绝对路径。
+  相对是指相对于当前路径，./ 相对路径可以省略
+  绝对路径是以根目录为始的路径，如/home/wgl
+				/etc/samba
+8.帮助选项：
+	1，pwd --help
+	2, help pwd
+	3, man ls
+	4, info ls
+##################################################################################
+
+
+2.文件的属性
+   _(d l c b)            rwx  r_x   r_x           1   wgl   class  aa.c
+
+   文件件的性质       属主 属组 其它组操作权限   属主  属组    文件
+   改变文件的属性
+   
+   1 文本模式表示
+     chmod u+x aa.c           //u表示当前用户
+     chmod g+rw aa.c          //g表示用户所属的组
+     chmod o+rwx aa.c         //o表示其它组
+	 chmod u=rw,g=r,o=r aa.c  //条件可以并写
+	 chmod +x aa.c            //all get x 
+	 
+   2 数字模式表示
+	 chmod 644 aa.c
+
+
+	 
+2.5 用户及组的创建与删除
+	useradd wgl
+	userdel wgl
+	userdel -r wgl
+	groupadd group
+	groupdel group
+	
+3.创建组，添加用户，实现同组与外组的访问
+	groupadd shenxian 
+	groupadd yaoguai
+	useradd ts  -g shenxian 
+	useradd -g  shenxian wk
+	useradd -g  yaoguai  bj
+	
+	ts will goto wk
+	su root
+	chmod g+x  /home/wk  //dir x cd 
+	chmod g+w  /home/wk  //dir w touch rm
+			     //dir r ls
+	
+	bj will goto wk
+	su root
+	chmod o+rwx /home/wk
+	
+	创建用户的信息及密码包存在/组信息
+	/etc/passwd
+	/etc/shadow
+	/etc/group
+	
+	系统默认创建用户的同时，创建与用户名相同的组,如何改变一个己创建的文件的用户和组。
+	chown  wgl file
+	chown  :wgl file
+	chown  wgl:wgl file
+
+  
+5.u盘的使用
+	mkdir  /mnt/usb
+	保证光标虚拟机内,插入u盘
+	df -h
+	mount  /dev/sdb1 /mnt/usb
+
+	umount /dev/sdb1 或mount /mnt/usb
+	不要在挂载目录，试图对本目录进行卸载
+	
+5.5 iso 文件的使用
+	1.菜单栏 VM - setting 将iso 文件放到光盘中
+	2.mkdir /mnt/cdrom
+	3.mount /dev/cdrom /mnt/cdrom
+	4.umount /dev/cdrom   umount /mnt/cdrom
+	
+5.6 如何按装vmtools 
+	1.菜单栏 VM - setting 将vmtool.iso 文件放到光盘中
+	2.mkdir /mnt/cdrom
+	3.mount /dev/cdrom /mnt/cdrom
+	4.cp /mnt/cdrom/VM-----tool  /root
+	5.cd /root
+	6.tar zxvf VM-------tool
+	6.5./xxx.pl
+	7.一路回车，至到出同enjoy.reboot重起。
+
+
+**********************************************************************
+shell常用功能
+
+	1.命令补全：tab
+	2.历史命令：history  history -c
+	3.别名功能：
+		alias la='ls -a'
+		ualias la
+	4.输入输出重定向：
+		1.输入重定向 <
+			wc <file
+		2.输出得定向 >  >>
+			ls >file.bak
+		    追加 ls >>file.bak
+
+	    	3.输出错误重定向 2> 2>>
+			ls 2>err.bak
+			追加 ls 2>>err.bak
+		4.输出与错误重定向 &>
+			ls afile bfile &> errfile
+	5.管道命令
+		rpm -qa|grep samba
+		ls |grep hell|*.bak
+
+shell编程
+	1.自定义变量和环境变量
+		自定义变量也叫临时变量，环境变量也叫永久变量
+	2.DAY=sunday  (等号两侧不能用空格)
+	  echo $DAY
+	  DAYY=$DAY
+	  echo $DAYY
+	  TODAY='$DAY is a good day'
+	  echo $TODAY 
+	  $DAY is a good day
+	  TODAT="$DAY is a good day"
+	  echo $TODAY 
+	  sunday is a good day
+	  
+	  TIME=`date`  （tab上面的标识符）
+	  echo $TIME
+	
+	#!/bin/sh
+	# comment
+	3.test [ -d -x ] [/etc] [/opt/aa.c]
+
+	4.if text -d /etc ;then
+		echo "/etc/ is a dir"
+	  fi  
+	  if [ -d /etc ]
+	  then
+		echo "/etc/ is a dir"
+	  fi
+
+	5.if [ $# -ne 2 ]
+		echo "not enough para"
+		exit 0
+	  fi
+	  if [ $1 -eq $2 ]
+		echo "$1 == #2"
+	  elif [ $1 -gt $2 ]
+		echo "$1 > $2 "
+	  elif [$1 -lt $2 ]
+		echo "$1 < $2 "
+	  fi
+	6.for do done
+	  NUM=1
+	  for NUM in 1 2 3 4 5 6 
+	  do 
+		echo "The num is $NUM"
+	  done
+
+	7.while do done
+	  NUM=1
+	  while [ $NUM -le $1 ]
+	  do
+		echo "The num is $NUM"
+		touch file.$NUM
+		NUM = `expr $NUM + 1`  
+	 #  NUM = $((NUM+1))
+	  done
+
+	8 case esac
+	 if [ $# -le 1 ]
+		echo "not enough para"
+		eixt 0
+	 fi
+	 case $1 in
+		a|A)	echo '$1 = ' $1
+			;;
+		b|B)  echo '$1 = ' $1
+			;;
+		c|C)  echo '$1 = ' $1
+			;;
+		*) echo "invalid  input"
+	 esac
+***************************************************************************
+5.7
+	1.rpm -qa 查询现有机算机中的rpm安装的软件 q-query a-all 
+	2.rpm -qa |grep vim 
+	3.rpm -e  vim-common   //注意依赖关系   e-erase
+		3.5 rpm -e --nodeps vim-common 不检查依赖关系。
+	4.rpm -ivh vim-common-7.0.109-7.el5.i386.rpm  //i install v-verbose h-hash
+	
+6.yum源的使用(使用光盘)
+	1.mkdir /mnt/cdrom 
+	2.mount /dev/cdrom /mnt/cdrom
+	3.cd /etc/yum.repos.d/
+	4.mv CentOS-Base.repo CentOS-Base.repo.bak  //关闭网络源
+	5.vim CentOS-Media.repo
+		name=CentOS-$releasever - Media
+		baseurl=file:///mnt/cdrom
+		#        file:///media/cdrom/
+		#        file:///media/cdrecorder/
+		gpgcheck=0
+		enabled=1
+	6.yum update
+	7.yum search samba
+	8.yum install samba
+	9.yum erase samba
+
+	yum 文件锁：
+	rm -f /var/run/yum.pid
+	/sbin/service yum-updatesd restart
+	Stopping yum-updatesd:                                     [ OK ]
+	Starting yum-updatesd:                                     [ OK ]
+	
+7. nfs 使用
+    1.rpm -qa |grep nfs
+		nfs-utils-1.0.9-50.el5
+		nfs-utils-lib-1.0.8-7.6.el5
+	2.rpm -qa|grep portmap
+		portmap-4.0-65.2.2.1
+		
+		
+	3.vim /etc/exports
+		/opt *(sync,ro) 192.168.1.105(sync,rw)
+	3.5 服务器与客户端相互ping的通。
+	4.service portmap restart (must start up before nfs)
+	5.service nfs restart /etc/init.d/nfs restart
+	6.showmount -e 192.168.1.101 查看服务器上共享了哪些文件夹
+	7.mkdir /mnt/nfs
+	8.mount [-t nfs] 192.168.1.101:/opt  /mnt/nfs	
+	
+	
+	
+	9.修改了配置文件一般要重起服务，也可以用命令重新加载配置
+		exportfs -rv
+	10.showmount –a 	——显示挂载的共享目录列表和NFS客户机的地址
+
+	11.system-nfs-config  可以图形化配置 
+	
+	备注：客户端的访问权限，由两部分组成，1，配置文件中的权限，2 文件夹本身的权限
+	chmod o+w /opt
+
+8 samba 的使用
+
+	用户认证服务
+	
+	1.保证window和linux 相互ping的通。
+	2.添加linux 用户  useradd wgl  passwd wgl
+	3.将linux用户作为smb的访问用户 首次添加用-a，smbpasswd -a wgl 
+	  如果没有-a 表示对己有用户修改密码
+		添加Samba用户帐号
+		# smbpasswd -a sambauser 
+				禁用Samba用户帐号 
+				# smbpasswd -d sambauser
+				启用Samba用户帐号 
+				# smbpasswd -e sambauser
+				删除Samba用户帐号 
+				# smbpasswd -x sambauser
+	4.重起smb服务 service smb restart  或 /ect/init.d/smb restart
+	5.关闭防火墙  service iptables stop
+	5.5 ifconfig   192.168.50.128
+	6.win中 开始->运行  \\192.168.50.128
+
+	默认情况下，linux共享了/home/wgl这个目录。
+
+	去除己有的联接 net use * /delete /y
+	
+	开始共享服务区
+	
+	vim /etc/samba/smb.conf
+		282     [public]
+		283     comment = kasd;lfkasldkfPublic Stuff //共享文件夹的描述
+		284     path = /opt                          //共享的文件
+		285     public = yes
+		286     writable = yes
+		287     printable = no
+		288     write list = +staff
+
+	用linux 挂载windows 共享文件夹
+	mount -o username=adminstrator //192.168.16.85/12 /mnt/win
+		
+9. tftp 的使用
+	1 [root@localhost test]# rpm -qa|grep tftp
+		tftp-server-0.49-2.el5.centos   server
+		tftp-0.49-2.el5.centos          client
+	2 [root@localhost test]# rpm -qa|grep xinetd
+		xinetd-2.3.14-10.el5
+		
+	3  vim /etc/xinetd.d/tftp 
+	    disable         = no
+	3.5 cd /tftpboot
+	    touch hello.c
+		
+	4  service xinetd start
+	
+	5  tftp 192.168.1.101 
+	   tftp-> get hello.c
+	   tftp->q          /quit
+	   
+********************************************************************
+1.gcc 
+	1,从源文件到可执行文件要经进4个阶段，预处理，编译，汇编，链接
+	  gcc -E hello.c -o hello.i  gcc -E hello.c 默认打到屏幕上(处理以#号开头的语句)
+	  gcc -S hello.i -o hello.s  gcc -S hello.c 默认生成hello.s
+	  gcc -c hello.s -o hello.o  gcc -c hello.c 默认生成hello.o
+	  gcc hello.o -o hello       gcc hello.c    默认生成a.out
+	  
+	2.<>到系统指定的头文件路径找头文件，""先在当前路径下找，如没有，再找系统路径
+	  /opt
+		hello.c
+		#include <hello.h>
+		int main()
+		{
+			printf("hello.world!!\n");
+			return 0;
+		}
+	  /opt/include 	
+		hello.h
+		#include <stdio.h>
+		
+	指定头文件路径：
+		gcc  hello.c -o hello  -I/opt/include 
+	
+	3.优化(4级优化选项)
+		gcc -O0 optimize.c  -o wyh
+		gcc -O1 optimize.c  -o yh1
+		gcc -O2 optimize.c  -o yh2
+		gcc -O3 optimize.c  -o yh3
+		
+		time ./wyh
+		time ./yh1
+		time ./yh2
+	  警告：在调试的时候最好不使用任何优化选项，只有当程序在最终发行的时候才考虑对其进行优化。
+	  
+	4.gcc -g gdb.c -o gdb  要想调试，必须加入调试信息-g
+	
+2 gdb gdb
+  
+	l 1 查看源文件
+	
+	b 6 断点所设的地方，即为程序执行的下一条语句
+	
+	info b查看断点
+	
+	s n 单步调试（仅在函数处有区别）
+	
+	r 全速运行
+	
+	c 从单步状态恢复运行
+********************************************************************* 
+1 makefile
+	1.1 以学生管理系统为例
+	compile.sh脚本写法如下：
+	gcc -c common.c 
+	gcc -c student.c
+	gcc -c teacher.c
+	gcc -c main.c 
+	gcc common.o student.o teacher.o main.o -o aa
+	rm -rf *.o 
+	
+	./aa 
+	
+	写成makefile
+	STU: common.o student.o teacher.o main.o
+		gcc common.o student.o teacher.o main.o -o STU
+	common.o:common.c
+		gcc -c common.c 
+	student.o:student.c
+		gcc -c student.c
+	teacher.o:teacher.c
+		gcc -c teacher.c
+ 
+	clean:
+		rm -rf *.o STU
+改进1：	
+	STU: common.o student.o teacher.o main.o
+		gcc common.o student.o teacher.o main.o -o STU
+	common.o:common.c
+		
+	student.o:student.c
+	
+	teacher.o:teacher.c
+		
+	main.o:main.c
+	clean:
+		rm -rf *.o STU
+
+引进变量：
+	CC:=gcc 
+	OBJECT := common.o student.o teacher.o main.o
+	STU:$(OBJECT)
+		CC  $^ -o $@
+	clean:
+		rm -rf *.o STU
+	
+*********************************************************************** 
+1.svn 
+	1.mkdir c:\svnrepos  创建仓库目录
+	2.svnadmin create c:\svnrepos  创建仓库
+		2.5.设置svnserve.conf
+		anon-access = write   设置匿名访问
+	
+	3.start svnserve -d -r c:\svnrepos  启动服务
+
+	4 初始化导入仓库数据
+		svn://192.168.0.143
+	 
+	5.设置svnserve.conf
+		# anon-access = write
+		auth-access = write  //认证访问
+		password-db = passwd //设定秘码
+		authz-db = authz     //设定访问权限
+		
+	8.设置passwd
+		admin = admin
+		m1 = m1
+		m2 = m2
+		t1 = t1
+	9.设置权限
+		m1_m2 = m1,m2  分组
+
+		[/]
+		admin = rw
+		@m1_m2 = r
+		t1 = r
+		* = 
+
+		[/Market]
+		admin = rw
+		@m1_m2 = rw
+		* =
+
+		[/Tech]
+		admin = rw 
+		t1 = rw 
+		* = 
+(2)
+mkdir /home/svnrepo			----Linux平台
+svnadmin create /home/svnrepo
+svnserve --daemon --root /home/svnrepos
+
+***********************************************************************
+
+烧鸡过程：
+
+	1.在windows上按装USB下载驱动
+		FriendlyARM USB Download Driver Setup_20090421.exe
+	2.在windows上按装USB转串口软件
+		usbtoserial
+	3.按装超级终端:
+		开始-->附件-->通信-->超级终端
+		（如出现中华人民共和国，取消，是）
+		连接描述->起个名字你爱听的名字，选个你喜欢的图片
+		连接到 com11(右键我的电脑，设备管理器，端口com11)
+		com11属性 
+			每秒位数（波特率） 115200
+			硬件流： 无
+		确定
+		此时能看到一个终端：
+		
+	4.打开dnw 显示USB OK 表示成功。
+	5.在串口终端中
+		1.输入x 格式化flash
+		2.输入v 下载bootloader 
+			显示等待下载：
+		3.打开dnw USBPORT->Transmit/Restor
+			选择supervivi128
+		4.输入k 下载kernel  重复3，选择ZimageW(NX)35
+		5.输入y 下载根文件系统，重复3，选择 rootfs_qtopia_qt4.img
+	6.下载完毕。
+	7.关闭电源，刷机开关打到正常开机状态。重开电源，记得校正。
+	8.恭喜你，开始玩机。
+			
+	
+
+
+
+
+2.1 umask 默认为0 022
+	touch 默认为0 666
+	gcc   所得编译文件为 0 777
+	1
+		umask 0
+		touch aa.c   0666
+		gcc  -o a.out aa.c  0777
+	
+	2
+		umask 022
+		touch aa.c   0644       （0666&~0022）
+		gcc  -o a.out aa.c  0755（0777&~0022）
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+  
+   
+  

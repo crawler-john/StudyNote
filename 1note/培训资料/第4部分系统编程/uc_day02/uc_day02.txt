@@ -1,0 +1,161 @@
+一.动态库
+1.创建动态库
+1)编辑源程序 .c/.h
+2)编译成目标模块：
+gcc -c -fpic xxx.c	---> xxx.o
+-fpic:小模式,代码量比较小，速度快，只支持一部分平台，如linux
+-fPIC:大模式，代码量比较大,速度慢，所有平台都支持
+3)链接成共享库
+gcc -shared xxx.o... -o libxxx.so
+
+2.使用动态库
+1)静态加载
+gcc main.c libmath.so
+gcc main.c -lmath -L.
+export LIBRARY_PATH = $LIBRARY_PATH:.
+gcc main.c -lmath
+
+运行时要保证LD_LIBRARY_PATH环境变量包含动态库所在路径
+
+2)动态加载
+#include <dlfcn.h>
+A.加载共享库
+void *dlopen(
+	const char *filename,
+	int flag
+);
+filename:如果你只给共享库文件名，则通过LD_LIBRARY_PATH环境变量搜索共享库。若给的是共享库的路径，不适用环境变量
+flag:
+RTLD_LAZY:延迟加载，什么时候使用共享库再实际载入
+RTLD_NOW:立即加载
+成功返回动态库的句柄，失败返回NULL
+
+B.获取函数地址
+void *dlsym(
+	void *handle,//共享库句柄
+	const char *symbol//函数名
+);
+成功返回函数地址，失败返回NULL
+
+C.卸载共享库
+int dlclose(
+void *handle//共享库的句柄
+);
+成功返回0,失败返回非0
+
+D.获取错误信息
+char *dlerror(void);
+返回错误信息的字符串，没有错误返回NULL
+
+gcc 1dyso.c -ldl
+
+三.几个辅助工具
+nm:查看目标文件，库文件，可执行文件的符号列表
+ldd:查看可执行程序或共享库的动态依赖
+strip:通过删除符号表和调试信息，给目标文件，可执行文件，库文件减肥
+objdump:对机器指令做反汇编
+
+四.错误处理
+1.通过返回值表示错误
+1)返回合法值表示成功，非法值表示失败
+2)返回有效指针表示成功,返回空指针(NULL/0xffffffff)表示失败
+3)返回0表示成功,返回-1表示失败，如果有数据需要返回给调用者,可以通过使用指针形参向其输出
+4)如果一个函数永远不会失败,也没有数据需要提供给调用者,可以没有返回值
+
+2.通过错误代码获取函数失败的原因
+#include <errno.h>//extern int errno;
+1)通过errno全局变量获取错误原因
+2)将errno转换成一个字符串
+#include <string.h>
+	char *strerror(int errnum);
+#include <stdio.h>
+	void perror(const char *s);
+	printf("%m");
+
+所有的错误代码都非0，errno=0表示无错误
+
+errno是一个全局变量,其值随时有可能发生变化,不安全
+
+五.环境变量
+1.环境表
+1)每个进程都会收到一张环境表
+是一个以NULL指针结尾的字符指针数组
+注意：当我们以指针数组作为形参时,通常不传递数组大小，而使数组以空指针结	束
+2)全局变量environ保存了环境表的首地址
+3)main函数的第三个参数就是环境表的首地址
+
+2.环境变量的函数
+所在库<stdlib.h>
+环境变量:<name> = <value>
+getenv:通过name获得value
+putenv:以<name> = <value>形式设置环境变量，如果name不存在就添加
+					存在就修改
+setenv：根据name设置value，若name已经存在，根据参数决定是否覆盖原value
+unsetenv：删除环境变量
+clearenv:清空环境变量,environ == NULL
+
+
+作业：写一个函数,获取一个文件的大小
+  1 #include <stdio.h>
+  2 #include <sys/stat.h>
+  3 #include <unistd.h>
+  4 int main(int argc,char **argv)
+  5 {
+  6 
+  7     struct stat buf;
+  8     if (argc != 2)
+  9     {
+ 10         printf("请以./a.out <filename>输入！\n");
+ 11         return -1;
+ 12     }
+ 13     //int stat(const char *file_name,struct stat *buf);
+ 14     //成功返回0，失败返回-1
+ 15     if(stat(argv[1],&buf) == 0)
+ 16     {
+ 17         printf("%s file size:%ld\n",argv[1],buf.st_size);
+ 18         return 0;
+ 19     }
+ 20     else
+ 21     {
+ 22         printf("并没有你输入的文件\n");
+ 23         return -1;
+ 24     }
+ 25 
+ 26 }
+
+文件属性结构体：
+struct stat {
+    dev_t         st_dev;       //文件的设备编号
+    ino_t         st_ino;       //节点
+    mode_t        st_mode;      //文件的类型和存取的权限
+    nlink_t       st_nlink;     //连到该文件的硬连接数目，刚建立的文件值为1
+    uid_t         st_uid;       //用户ID
+    gid_t         st_gid;       //组ID
+    dev_t         st_rdev;      //(设备类型)若此文件为设备文件，则为其设备编号
+    off_t         st_size;      //文件字节数(文件大小)
+    unsigned long st_blksize;   //块大小(文件系统的I/O 缓冲区大小)
+    unsigned long st_blocks;    //块数
+    time_t        st_atime;     //最后一次访问时间
+    time_t        st_mtime;     //最后一次修改时间
+    time_t        st_ctime;     //最后一次改变时间(指属性)
+};
+                                                
+使用stat函数最多的可能是ls-l命令，用其可以获得有关一个文件的所有信息。
+1 函数都是获取文件（普通文件，目录，管道，socket，字符，块（）的属性。
+函数原型
+#include <sys/stat.h>
+int stat(const char *restrict pathname, struct stat *restrict buf);
+提供文件名字，获取文件对应属性。
+int fstat(int filedes, struct stat *buf);
+通过文件描述符获取文件对应的属性。
+int lstat(const char *restrict pathname, struct stat *restrict buf);
+连接文件描述命，获取文件属性。
+
+
+
+
+
+
+
+
+

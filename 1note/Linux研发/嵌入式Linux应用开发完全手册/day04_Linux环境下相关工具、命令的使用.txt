@@ -1,0 +1,100 @@
+需要学习的要点：
+    掌握Linux下的代码阅读工具、编辑工具Source Insight
+    掌握Linux下与Windows进行交互的工具：Cuteftp、SecureCRT
+    掌握Linux下的代码阅读工具、编辑工具KScope、串口工具C-kermit
+    掌握一些常用的Linux命令
+
+4.1Windows环境下的工具介绍
+    4.1.1代码阅读、编辑工具Source Insight
+    	1.创建一个Source Insight工程
+	    启动Source Insight之后默认的支持文件中没有以“.S”结尾的汇编语言文件，单机菜单“Options”->“Document Option”，在弹出的对话框中选择“Document Type”为“C Source File”，在“File filter”中添加“*.S”类型。
+	2.同步源文件
+	    单机菜单“Project”->“Synchronize Files”，会弹出一个对话框，选中其中的“Force all files to be re-parsed”（表示强制分析所有文件），单机OK。
+	3.Source Insight工程使用示例
+	    按住Ctrl键的同事，单机某个变量、函数、宏，就可以跳转到定义他们的位置
+	    按住Alt+“,”可以让主窗口退回到上一个画面。
+	    按住Alt+“.”可以让主窗口退回到下一个画面。
+    4.1.2文件传输工具Cuteftp
+	Cuteftp是一款FTP客户端软件，只要在Linux上安装、启动了FTP服务，就可以使用Cuteftp在Windows与Linux之间进行文件传输。
+    4.1.3远程登录工具SecureCRT
+	SecureCRT支持多种协议，比如SSH2，SSH1，Telnet，Serial等。可以用它来连接Linux服务器，作为一个远程控制台进行各类操作；也可以用它连接串口，操作目标板。
+    4.1.4TFTP服务器软件Tftpd32
+	Tftpd32是一款其变得DHCP、TFTP/SNTP和Syslog服务器软件，同时也是一款TFTP客户机软件。使用U-Boot是可以使用它的TFTP服务器功能下载软件到目标板中（也可以使用Linux中的NFS服务代替）
+4.2 Linux环境下的工具、命令介绍
+    4.2.1代码阅读、编辑工具KScope
+	安装KScope
+	    sudo apt-get install kscope
+	建立KScope工程
+    4.2.2远程登录工具C-kermit
+	C-Kermit是一款集成了网络通讯、串口通讯的工具，它有如下多种功能
+	    支持Kermit文件传输协议。
+	    自定义了一种脚本语言，它强大而且易于使用，可用于自动化工作。
+	    无论时网络通讯，还是串口通讯，操作是一致的，并且支持多种硬件、软件平台
+	    有安全认证、加密功能
+	    内建FTP、HTTP、客户端功能以及SSH接口。
+	    支持字符集转换。
+	安装
+	    sudo apt-get install ckermit
+	    使用kermit之前现在/home/student 创建一个.kermrc的配置文件，内容如下：
+		  1 set line /dev/ttyS0
+		  2 set speed 115200
+		  3 set carrier-watch off
+		  4 set handshake none
+		  5 set flow-control none
+		  6 robust
+		  7 set file type bin
+		  8 set file name lit
+		  9 set rec pack 1000
+		 10 set send pack 1000
+		 11 set window 5
+    4.2.3编辑命令Vi
+	三个模式 命令行模式 文本输入模式 末行模式
+    4.2.4查找命令grep、find命令的使用
+	在Linux下常用grep命令列出含有摸个字符串的文件，常用find命令查找匹配给定文件名的文件
+	1.grep命令
+	    用法 grep [options] PATTERN [FILE...] 例子：grep "request_irq" * -R
+	2.find命令
+	    用法 find [-H] [-L] [-P] [path...] [expression] 
+		例子：在内核目录下查找文件名包含“fb”字样的文件 find -name "*fb*"
+			find drivers/net -name "*fb*"
+    4.2.5在线手册查看命令man
+	man命令的基本用法    man [section] name
+	Linux 在线手册的区号以及类别
+	    1.命令
+	    2.系统调用
+	    3.库调用
+	    4.特殊文件 比如/dev/目录下的文件
+	    5.文件格式和惯例 比如/etc/passwd等
+	    6.游戏
+	    7.其他
+	    8.系统管理命令， 类似mount等只有系统管理员才能执行的命令
+	    9.内核例程（这个区号基本没被使用）
+    4.2.6其他命令
+	1.tar命令
+	    tar命令具有打包、解包、压缩、解压缩4中功能。常用的压缩解压缩方式有两种：gzip、bzip。一般而言，以“.gz”、".z"结尾的文件使用gzip方式压缩的，以".bz2"结尾的文件是用bzip2方式进行压缩的，后缀名中有"tar"字样时表示这是一个文件包
+	    tar命令常用的5个选项。
+		1>"c"表示创建，用来生成文件包。
+		2>"x"表示提取，从文件包中提取文件。
+		3>"z"使用gzip方式进行处理，它与"c"结合就表示压缩，与"x"结合就表示解压缩
+		4>"j"使用bzip2方式进行处理，它与"c"结合就表示压缩，与"x"结合就表示解压缩
+		5>"f"表示文件，后面接着一个文件名。
+	    例子:
+		tar czf dirA.tar.gz dirA //将目录dirA压缩为文件包 dirA.tar.gz,以bzip方式进行压缩
+		tar cjf dirA.tar.bz2 dirA //将目录dirA压缩为文件包dirA.tar.bz2，以bzip2方式进行压缩
+		tar xzf dirA.tar.gz 	//解压
+		tar xjf dirA.tar.bz2	//解压
+		tar xzf dirA.tar.gz -C <dir> //解压到指定目录
+		tar xjf dirA.tar.bz2 -C <dir> //解压到指定目录
+	2.diff、patch命令
+	    diff命令常用来比较文件、目录、也可以用来制作补丁文件。所谓"补丁文件"就是修改后的文件"与"原始文件"的差别。
+	    常用选项如下
+		"-u"表示比较结果中输出上下文中一些相同的行，这样利于人工定位。
+		"-r"表示递归比较各个子目录下的文件
+		"-N"将不保存的文件当中空文件
+		"-w"忽略对空格的比较
+		"-B"忽略对空行的比较
+	    制作补丁文件linux-2.6.22.6_ok.diff 
+		diff -urNwB linux-2.6.22.6 linux-2.6.22.6_ok > linux-2.6.22.6_ok.diff
+	    patch命令被用来打补丁--依据补丁文件来修改原始文件。
+		patch -p1 < ../linux-2.6.22.6_ok.diff    //在对应的源代码目录下
+		-pn 补丁文件中指明了要修改的文件的路径，“-pn”表示忽略路径中第n个斜线之前的目录

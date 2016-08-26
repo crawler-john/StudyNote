@@ -1,0 +1,269 @@
+linux内核启动最后是
+挂载根文件系统
+运行init进程
+
+之前使用的是已经做好的根文件系统
+/home/student/workdir/rootfs
+
+根文件系统的移植就是构建一个根文件系统
+
+文件系统的组成：
+bin:存放的是所有用户都可以使用的基本命令
+sbin:存放的系统命令，只有管理员才可以访问
+usr:存放的是用户的命令，各类文档
+dev:存放的是设备文件,设备文件是Linux系统特有的文件类型，在Linux系统中，    所有的设备的操作都是通过访问设备文件来实现
+	访问设备文件的方法和访问普通文件的方法是一样的
+	open/read/write/ioctl/.....
+etc:存放各种配置文件
+	inittab:init进程的配置文件
+	fstab:执行mount -a时的配置文件
+proc:是一个空目录，常用作proc文件系统的挂载点
+	proc文件系统是一个虚拟的文件系统，没有实际的存储设备，里面的目	录文件都是临时产生的，表示系统的运行状态
+sys:是一个空目录，常用作sys文件系统的挂载点
+mnt:是一个空目录,用作于文件系统的挂载点
+lib:存放共享库
+tmp:存放临时文件
+home:用户目录	
+var:存放系统的日志文件和服务程序的临时文件
+
+构建最小文件系统
+bin
+sbin
+usr
+dev
+lib
+
+1.通过busybox创建bin sbin usr linuxrc
+busybox		开源软件(瑞士军刀)
+将众多的命令集合进一个很小的可执行程序，GNU工具操作复杂，可配置的选项多，而busybox可以满足嵌入式的一般需求
+busybox可以很轻易地加入某些命令，删除某些命令(可配置)
+
+1)修改编译器
+ 164 ARCH = arm
+ 165 CROSS_COMPILE = arm-linux-
+
+2)make menuconfig进行配置(使用默认菜单)
+3)make
+4)make install
+多出了一个文件夹_install
+bin	sbin	usr	linuxrc
+
+2.创建dev目录
+cd _install
+mkdir dev
+cd dev
+创建设备文件
+1)暴力拷贝法
+将Ubuntu下的设备文件全部拷贝到该目录下来
+2)手动创建法
+sudo mknod 	console 	c 		5 	1
+     命令	设备文件名    设备类型	    主设备号	次设备号
+设备类型	：字符设备  c
+	  块设备    b
+	  网络设备  
+	  主设备号用来找到设备对应的驱动程序,次设备号用来区分使用同样驱	  动程序的设备
+sudo mknod null c 1 3
+
+3.创建lib目录
+mkdir lib
+查看bin/busybox需要哪些库
+arm-linux-readelf -d bin/busybox
+
+ 0x00000001 (NEEDED)                     Shared library: [libm.so.6]
+ 0x00000001 (NEEDED)                     Shared library: [libc.so.6]
+
+确定了busybox需要的动态库是libm.so.6 libc.so.6
+--->库在哪？
+在交叉编译工具
+/home/student/arm/arm-2009q3/arm-none-linux-gnueabi/libc/lib
+
+cp ld-* libc-* libc.* libm-* libm.* /home/student/dyhy1502/busybox-1.21.1/_install/lib -a
+
+修改/etc/exports
+ 11 /home/student/dyhy1502/busybox-1.21.1/_install *(rw,sync,no_root_squash)
+重启nfs服务
+sudo /etc/init.d/nfs-kernel-server restart
+
+修改bootargs
+set bootargs root=/dev/nfs init=/bin/sh nfsroot=192.168.1.141:/home/student/study/busybox-1.21.1/_install ip=192.168.1.20:192.168.1.141:192.168.1.1:255.255.255.0::eth0:on console=ttySAC0,115200
+
+使用busybox自身的init程序
+/etc/inittab配置文件
+格式:
+<id>:<runlevels>:<action>:<process>
+
+<id>:控制台,省略
+<runlevels>:运行级别,省略
+<ations>:控制这个子程序的运行方式，有8种
+	1.sysinit:表示系统启动后最先执行,只执行一次,init进程等待它结束	后才继续执行其他动作
+	2.wait:系统执行完sysinit后执行,只执行一次
+	3.once:系统执行完wait后执行,只执行一次
+	4.respawn:系统执行完once后执行,init进程发现子程序退出时，会重新	启动它
+	5.askfirst:系统执行完respawn后执行，与respawn相似，区别在于启	动子程序前会打印
+	“please press enter to active this console”
+	6.restart:重启时执行
+	7.shutdown:当关机时执行
+	8.ctrlaltdel:按下ctrl+alt+delete时执行
+<process>:要执行的程序,可以是程序，也可以是脚本，如果前面加了-，表示是	可交互的程序
+
+/etc/fstab被指文件
+device     mount-point    type   options        dump  fsck order
+proc           /proc        proc   defaults        0     0
+sysfs          /sys         sysfs  defaults        0     0
+
+device:设备文件，也就是要挂载的设备
+mount_point:挂载点
+type:文件系统类型
+options:挂载的参数
+dump:省略
+fsck order:省略
+
+修改bootargs
+set bootargs root=/dev/nfs init=/linuxrc nfsroot=192.168.1.141:/home/student/dyhy1502/busybox-1.21.1/_install ip=192.168.1.20:192.168.1.141:192.168.1.1:255.255.255.0::eth0:on console=ttySAC0,115200
+
+
+NFS网络文件系统
+几种常见的文件系统类型
+1.cramfs(只读的文件系统):不能写任何文件进去
+制作cramfs文件系统的镜像
+sudo mkfs.cramfs _install rootfs.cramfs
+cp rootfs.cramfs /tftpboot/
+
+tftp 20008000 rootfs.cramfs
+nand erase e00000 200000
+nand write 20008000 e00000 200000
+
+修改bootargs
+set bootargs root=/dev/mtdblock4 init=/linuxrc console=ttySAC0,115200 rootfstype=cramfs
+
+save
+
+要求内核支持该类型的文件系统
+make menuconfig
+
+File systems  ---> 
+	[*] Miscellaneous filesystems  --->
+		 <*>   Compressed ROM file system support (cramfs) 
+make zImage
+cp zImage /tftpboot
+
+
+基于内存的文件系统
+2.ramdisk
+将一部分固定大小的内存用作分区来用，它并非一个实际的文件系统，而是将一个实际的文件系统装入内存的机制，并且可以当做文件系统使用
+这种文件系统比较简单，我们可以办一些经常访问但是不改变的文件，通过ramdisk放在内存中，大大提高访问速度
+
+如何制作：
+sudo dd if=/dev/zero of=initrd.img bs=1k count=8142
+//生成一个8M的分区initrd.img
+sudo mkfs.ext2 -F initrd.img
+//将initrd.img格式化成ext2格式
+sudo mkdir /mnt/initrd
+//创建挂载点
+sudo mount -t ext2 -o loop initrd.img /mnt/initrd
+//将initrd.img按照ext2硬盘分区的格式挂在到/mnt/initrd
+sudo cp -a _install/* /mnt/initrd
+//将文件系统拷贝到/mnt/initrd(相当于写到initrd.img)
+sudo umount /mnt/initrd
+//解除挂载
+gzip --best -c initrd.img >ramdisk.img
+//将initrd.img压缩输出到ramdisk.img
+cp ramdisk.img /tftpboot
+
+修改bootcmd,bootargs
+set bootcmd nand read 20008000 600000 500000\;tftp 30008000 ramdisk.img\;bootm 20008000
+
+set bootcmd nand read 20008000 600000 500000\;nand read 30008000 e00000 200000\;bootm 20008000
+set bootargs root=/dev/ram rw initrd=0x30008000,8M console=ttySAC0,115200
+
+save
+
+要求内核支持ramdisk文件系统
+make menuconfig
+Device Drivers  ---> 
+	[*] Block devices  --->
+		<*>   RAM block device support                              		(16)    Default number of RAM disks                          		(8192)  Default RAM disk size (kbytes)
+make zImage
+cp zImage /tftpboot
+
+
+3.initramfs
+将内核和文件系统做在一起
+cd _install
+sudo chmod 777 .ash_history
+
+make menuconfig
+ General setup  ---> 
+   [*] Initial RAM filesystem and RAM disk (initramfs/initrd) support 
+   (/home/student/dyhy1502/busybox-1.21.1/_install) Initramfs source file(s)
+
+make zImage
+cp zImage /tftpboot
+
+修改bootcmd bootargs
+set bootcmd tftp 20008000 zImage\;bootm 20008000
+set bootargs root=/dev/ram rw rdinit=/linuxrc console=ttySAC0,115200
+
+save
+
+4.yaffs
+基于flash的可读可写的文件系统
+
+让内核支持该类型的文件系统
+make menuconfig
+File systems  ---> 
+	[*] Miscellaneous filesystems  --->
+		<*>   YAFFS2 file system support
+
+制作yaffs文件系统的镜像
+1.先要创建制作工具
+tar -xvf yaffs2-source.tar
+cd yaffs2/utils
+make
+在该目录下出现了mkyaffs2image  mkyaffsimage
+sudo cp mkyaffs2image  mkyaffsimage /usr/bin
+制作工具就准备好了
+
+2.利用制作工具制作yaffs文件系统镜像
+mkyaffs2image _install rootfs.yaffs
+cp rootfs.yaffs /tftpboot
+
+tftp 20008000 rootfs.yaffs
+nand erase e00000 1f200000
+nand write.yaffs 20008000 e00000 $filesize
+
+3.将内核配置成不加入文件系统重新编译，报zImage拷贝到/tftpboot
+
+4.修改bootcmd bootargs
+set bootcmd tftp 20008000 zImage\;bootm 20008000
+set bootargs root=/dev/mtdblock4 init=/linuxrc console=ttySAC0,115200 rootfstype=yaffs rw
+
+
+
+
+
+
+
+
+四种fs设置bootargs的方式
+nfs
+set bootargs root=/dev/nfs init=/linuxrc nfsroot=192.168.1.141:/home/student/dyhy1502/busybox-1.21.1/_install ip=192.168.1.20:192.168.1.141:192.168.1.1:255.255.255.0::eth0:on console=ttySAC0,115200
+
+cramfs
+set bootargs root=/dev/mtdblock4 init=/linuxrc console=ttySAC0,115200 rootfstype=cramfs
+ramdisk
+set bootcmd nand read 20008000 600000 500000\;tftp 30008000 ramdisk.img\;bootm 20008000
+set bootargs root=/dev/ram rw initrd=0x30008000,8M console=ttySAC0,115200
+initramfs
+set bootcmd tftp 20008000 zImage\;bootm 20008000
+set bootargs root=/dev/ram rw rdinit=/linuxrc console=ttySAC0,115200
+yaffs
+set bootcmd tftp 20008000 zImage\;bootm 20008000
+set bootargs root=/dev/mtdblock4 init=/linuxrc console=ttySAC0,115200 rootfstype=yaffs rw
+
+
+
+
+
+
+
