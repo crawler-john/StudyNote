@@ -1,0 +1,260 @@
+进程地址空间
+	内核中的函数以相当直截了当的方式获得动态内存：
+		1.__get_free_pages()和alloc_pages()从分区页框分配器中获得页框。
+		2.kmem_cache_alloc()和kmalloc()使用slab分配器为专门或通用对象分配快。
+		3.vmalloc()和vmalloc_32()获得一块非连续的内存区。
+	使用这些简单方法是基于以下两个原因：
+		内核是操作系统中优先级最高的成分。
+		内核信任自己。
+	当给用户态进程分配内存时，情况完全不同：
+		进程对动态内存的请求被认为是不紧迫的。
+		由于用户进程是不可信任的，因此，内核必须能随时准备捕获用户态进程引起的所有寻址错误。
+		
+进程的地址空间
+	进程的地址空间（address space）由允许进程使用的全部线程地址组成。每个进程锁看到的线性地址集合是不同的，一个进程所使用的地址与另一个进程所使用的地址之间没有什么关系。后面我们会看到，内核可以通过增加或删除某些线性地址区间来动态的修改进程的地址空间。
+	内核通过所谓线性区的资源来表示线性地址区间，线性区是由其实线性地址、长度和一些访问权限来描述的。为了效率起见，起始地址和线性区的长度都必须是4096的倍数，以便每个线性区所识别的数据完全填满分配给它的页框。
+	下面是进程获取新线性区的一些典型情况：
+		当用户在控制台输入一条命令时，shell进程创建一个新的进程去执行这个命令。
+		正在运行的进程有可能决定装入一个完全不同的程序。进程标识符不变，装入这个程序之前的线性区被释放，并获得新的线性区并被分配到这个进程。
+		正在运行的进程可能对一个文件（或它的一部分）执行“内存映射”。
+		进程可能持续向它的用户态堆栈增加数据，知道映射这个堆栈的线性区用完为止。
+		进程可能创建一个IPC共享线程区来与其他合作进程共享数据。
+		进程可能通过调用类似malloc()这样的函数扩展自己的动态区。
+	与创建、删除线性区相关的系统调用
+		系统调用					说明
+		brk()						改变进程堆大小
+		execve()					装入一个新的可执行文件，从而改变进程的空间地址
+		_exit()						结束当前进程并撤销它的地址空间
+		fork()						创建一个新进程，并为它创建新的地址空间
+		mmap(),mmap2()				为文件创建一个内存映射，从而扩大进程的地址空间
+		mremap()					扩大或缩小线性区
+		remap_file_pages()			为文件创建非线性映射
+		munmap()					撤销对文件的内存映射，从而缩小进程的地址空间
+		shmat()						创建一个共享线性区
+		shmdt()						撤销一个共享线性区
+	确定一个进程当前所拥有的线性区（即进程的地址空间）是内核的基本任务，因为这可以让缺页异常处理程序有效地区分引发这个异常处理程序的两种不同类型的无效线程地址：
+		由编程错误引发的无效线性地址。
+		由缺页引发的无效线性地址；即使这个线性地址属于进程的地址空间，但是对应于这个地址的页框仍然有待分配。
+	从进程的观点来看，后一种地址不是无效的，内核要利用这种缺页以实现请求调页：内核通过提供页框来处理这种缺页，并让进程继续执行。
+
+内存描述符
+	与进程地址空间有关的全部信息都包含在一个叫做内存描述符（memory descriptor）的数据结构中（实际上就是描述进程虚拟内存的数据结构），这个结构的类型为mm_struct，进程描述符的mm字段就指向这个结构。
+		struct mm_struct {
+			struct vm_area_struct * mmap;		/* list of VMAs */			//指向线性区对象的链表头
+			struct rb_root mm_rb;						//指向线性区对象的红-黑树的根
+			struct vm_area_struct * mmap_cache;	/* last find_vma result */	//指向最后一个引用线性区对象
+			unsigned long (*get_unmapped_area) (struct file *filp,			//在进程地址空间中搜索有效线性地址区间的方法
+						unsigned long addr, unsigned long len,
+						unsigned long pgoff, unsigned long flags);
+			void (*unmap_area) (struct vm_area_struct *area);				//释放线性地址区间时调用的方法
+			unsigned long mmap_base;		/* base of mmap area */			//标志第一个分配的匿名线性区或文件内
+			unsigned long free_area_cache;		/* first hole */			//内核从这个地址开始搜索进程地址空间中线性地址的空闲区间
+			pgd_t * pgd;						//指向页全局目录
+			atomic_t mm_users;			/* How many users with user space? */		//次使用计数器
+			atomic_t mm_count;			/* How many references to "struct mm_struct" (users count as 1) */ //主使用计数器
+			int map_count;				/* number of VMAs */		//线性区的个数
+			struct rw_semaphore mmap_sem;							//线性区的读写信号量
+			spinlock_t page_table_lock;		/* Protects page tables, mm->rss, mm->anon_rss */	//线性区的自旋锁和页表的自旋锁
+
+			struct list_head mmlist;		/* List of maybe swapped mm's.  These are globally strung	//指向内存描述符链表中的相邻元素
+								 * together off init_mm.mmlist, and are protected
+								 * by mmlist_lock
+								 */
+
+			unsigned long start_code, 	//可执行代码的起始地址
+							end_code,	//可执行代码的最后地址
+							start_data, //已初始化数据的起始地址
+							end_data;	//已初始化数据的最后地址
+			unsigned long start_brk,	//堆的起始地址
+							brk, 		//堆的当前最后地址
+							start_stack;//用户态堆栈的起始地址
+			unsigned long arg_start,	//命令行参数起始地址
+							arg_end, 	//命令行参数最后地址
+							env_start, 	//环境变量的起始地址
+							env_end;	//环境变量的最后地址
+			unsigned long rss, 			//分配给进程的页框数
+							anon_rss, 	//分配给匿名内存映射的页框数
+							total_vm, 	//进程地址空间的大小
+							locked_vm, 	//“锁住”而不能换出的页的个数
+							shared_vm;	//共享文件内存映射中的页数
+			unsigned long exec_vm, 		//可执行内存映射中的页数
+							stack_vm, 	//用户态堆栈中的页数
+							reserved_vm,//在保留区中的页数
+							def_flags, 	//线性区默认的访问标志
+							nr_ptes;	//this进程的页表数
+
+			unsigned long saved_auxv[42]; /* for /proc/PID/auxv */	//开始执行ELF程序是使用
+			
+			unsigned dumpable:1;		//表示是否可以产生内存信息转储的标志
+			cpumask_t cpu_vm_mask;		//用于懒惰TLB交换的位掩码
+
+			/* Architecture-specific MM context */
+			mm_context_t context;		//指向有关特定体系结构信息的表
+
+			/* Token based thrashing protection. */
+			unsigned long swap_token_time;	//进程在这个时间将有资格获得交换标志
+			char recent_pagein;		//如果最近发生了主缺页，则设置该标志
+
+			/* coredumping support */
+			int core_waiters;		//正在把进程地址空间的内容卸载到转储文件中的轻量级进程的数量
+			struct completion *core_startup_done, 	//指向创建内存转储文件是的补充原语
+								core_done;			//创建内存转储文件是使用的补充原语
+
+			/* aio bits */
+			rwlock_t		ioctx_list_lock;		//用于保护异步I/O上下文链表的锁
+			struct kioctx		*ioctx_list;		//异步I/O上下文链表
+
+			struct kioctx		default_kioctx;		//默认的异步I/O上下文
+
+			unsigned long hiwater_rss;	/* High-water RSS usage */	//进程所拥有的最大页框数
+			unsigned long hiwater_vm;	/* High-water virtual memory usage */	//进程线性区中最大页数
+		};
+	所有内存描述符存放在一个双向链表中。每个描述符在mmlist字段存放链表相邻元素地址。链表的第一个元素是init_mm的mmlist字段，init_mm是初始化阶段进程0所使用的内存描述符。
+	mm_alloc()函数用来获得一个新的内存描述符。由于这种描述符保存在slab分配器高速缓存中，因此，mm_alloc()调用kmem_cache_alloc()来初始化新的内存描述符，并把mm_users和mm_count字段置为1.
+
+内核线程的内存描述符
+	内核线程仅运行在内核态，因此，它们永远不会访问低于TASK_SIZE（等价于PAGE_OFFSET，通常为0xc0000000）的地址。与普通进程相反，内核线程不用线性区，因此，内存描述符的很多字段对内核线程是没有意义的。
+	
+线性区
+	Linux通过类型为vm_area_struct的对象实现线性区。
+	每个线性区描述符表示一个线性地址区间。
+	vm_ops字段指向vm_operations_struct数据结构，该数据结构存放的是线性区的方法。
+
+线性区数据结构
+	进程所拥有的所有线性区是通过一个简单的链表连接在一起的。出现在链表中的线性区是按内存地址的升序排列的；不过，每两个线性区可以由未用的内存地址区隔开。
+	内存描述符的map_count字段存放进程所拥有的线性区数目。默认情况下，一个进程可以最多拥有65536个不同的线性区，系统管理员可以通过写/proc/sys/vm/max_map_count文件来修改这个限定值。
+	
+线性区访问权限
+	“页”这个术语即表示一组线性地址又表示这组地址中所存放的地址。尤其是我们把结余0~4095之间的线性地址区间称为第0页，介于4096~8191之间的线性地址区间称为第1页，以此类推。因此，每个线性区都由一组号码连续的页所构成。
+	线性区页也存在相关的标志。它们存放在vm_area_struct描述符的vm_flags字段中。
+
+线性区的处理
+	查找给定地址的最邻近区find_vma()：
+		struct vm_area_struct *find_vma(struct mm_struct *mm, unsigned long addr)	//参数：1、进程内存描述符的地址mm 2、线性地址addr
+		它查找线性区的vm_end字段大于addr的第一个线性区的位置，并返回这个线性区描述符的地址；
+		函数find_vma_prev与find_vma()类似，不同的是它把函数选中的前一个线性区描述符的指针赋给附加参数ppre
+	查找一个与给定的地址区间相重叠的线性区find_vma_intersection()：
+		find_vma_intersection()函数查找与给定的线性地址区间相重叠的第一个线性区。
+	查找一个空闲的地址区间get_unmapped_area()：
+		函数get_unmapped_area()搜索进程的地址空间以找到一个可以使用的线性地址的区间。
+			unsigned long
+			get_unmapped_area(struct file *file, unsigned long addr, unsigned long len,	
+				unsigned long pgoff, unsigned long flags)		//len参数指定区间的长度，而非空的addr参数指定必须从哪个地址开始进行查找。
+	向内存描述符链表中插入一个线性区insert_vm_struct()：
+		insert_vm_struct()函数在线性区对象链表和内存描述符的红-黑树中插入一个vm_area_struct结构。
+			int insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)	//参数1.内存描述符地址 2.指定要插入的vm_area_struct对象的地址。
+
+分配线性地址区间：
+	do_mmap()函数为当前进程创建并初始化一个新的线性区。不过分配成功之后，可以把这个新的线性区与进程已有的其他线性区合并。
+	函数相关参数：
+		file和offset：如果信先行区将把一个文件映射到内存，则使用文件描述符指针和文件偏移量offset。
+		addr：这个线性地址指定从何时开始查找一个空闲的区间。
+		len：线性地址区间的长度。
+		prot：这个参数指定这个线性区所包含页的访问权限。
+		flag：这个参数指定线性区的其他标志。
+释放线性地址区间：
+	内核使用do_munmap()函数从当前进程的地址空间中删除一个线性地址区间。	
+		int do_munmap(struct mm_struct *mm, unsigned long addr, size_t len)	//参数1.进程内存描述符的地址mm 2.地址区间的起始地址start 3.长度len
+		该函数主要两个阶段：
+			第一阶段，扫描进程所拥有的线性区链表，并把包含在进程地址空间的线性地址区间中的所有线性区从链表中解除链接。
+			第二阶段，更新进程的页表，并把第一阶段找到并标识出的线性区删除。函数利用后面要说明的spilt_vma()和unmap_region()函数。
+		spilt_vma()函数的功能是把与线性地址区间交叉的线性区划分成两个较小的区间，一个在线性地址区间外部，另一个在区间的内部。
+		unmap_region()函数变量线性区链表并释放它们的页框。
+			static void unmap_region(struct mm_struct *mm,	//内存描述符指针mm
+				struct vm_area_struct *vma,		//指向第一个被删除线性区描述符的指针vma
+				struct vm_area_struct *prev,	//指向进程链表中vma前面的线性区的指针prev
+				unsigned long start,		//界定被删除线性地址区间的范围
+				unsigned long end)
+				
+缺页异常处理程序
+	Linux的缺页（Page Fault）异常处理程序必须区分一下两种情况：
+		由编程错误引起的异常
+		由引用属于进程地址空间还尚未分配物理页框的页所引起的异常。
+	线性描述符可以让缺页异常处理程序非常有效的完成它的工作。do_page_fault()函数是80x86上的缺页中断服务程序，它把引起缺页的线性地址和当前进程的线性区相比较，从而能够选择适当的方法处理异常。
+		do_page_fault()的第一步操作是读取引起缺页的线性地址。
+	
+处理地址空间以外的错误地址
+	如果address不属于进程的地址空间，那么do_page_fault()函数执行bad_area标记处的语句，如果错误在用户态，则发送一个SIGSEGV信号给current进程并结束函数；
+	如果异常发生在内核态，仍然有两种可选的情况：
+		异常的引起是由于把某个线性地址作为系统调用的参数传递给内核。
+		异常是因一个真正的内核缺陷所引起的。
+
+处理地址空间内的错误地址
+	如果addr地址属于进程的地址空间，则do_page_fault()装到good_area标记处执行
+	
+请求调页
+	术语“请求调页”指的是一种动态内存分配技术，它把页框的分配推迟到不能再推迟位置，也就是说，一直推迟到进程要访问的页不在RAM中时位置，由此引起一个缺页异常。
+	请求调页技术背后的动机是：进程开始运行的时候并不访问其地址空间中的全部地址；事实上，有一部分地址也许永远不被进程使用。对于全局分配来说，请求调页是首选的，因为它增加了系统中空闲页框的平均数，从而更好地利用空闲内存。
+	从另一个观点来看，在RAM总体保持不变的情况下，请求调页从总体上能使系统有更大的吞吐量。
+	被访问的页可能不在主存中，其原因或者是进程从没访问过该页，或者是内核已经回收了相应的页框。
+	在这两种情况下，缺页处理程序必须为进程分配新的页框。不过，如何初始化这个页框取决于是哪一种页以及页以前是否被进程访问过。特殊情况下：
+		1.或者这个从未被进程访问到且没有映射磁盘文件，或者页映射了磁盘文件。
+		2.页属于非线性磁盘文件的映射
+		3.进程已经访问过这个页，但是其内容被临时保存在磁盘上。
+	因此，handle_pte_fault()函数通过检查address对应的页表项能够区分三种情况：
+		static inline int handle_pte_fault(struct mm_struct *mm,
+			struct vm_area_struct * vma, unsigned long address,
+			int write_access, pte_t *pte, pmd_t *pmd)
+		{
+			pte_t entry;
+
+			entry = *pte;
+			if (!pte_present(entry)) {
+				/*
+				 * If it truly wasn't present, we know that kswapd
+				 * and the PTE updates will not touch it later. So
+				 * drop the lock.
+				 */
+				if (pte_none(entry))
+					return do_no_page(mm, vma, address, write_access, pte, pmd);
+				if (pte_file(entry))
+					return do_file_page(mm, vma, address, write_access, pte, pmd);
+				return do_swap_page(mm, vma, address, pte, pmd, entry, write_access);
+			}
+
+			if (write_access) {
+				if (!pte_write(entry))
+					return do_wp_page(mm, vma, address, pte, pmd, entry);
+
+				entry = pte_mkdirty(entry);
+			}
+			entry = pte_mkyoung(entry);
+			ptep_set_access_flags(vma, address, pte, entry, write_access);
+			update_mmu_cache(vma, address, entry);
+			pte_unmap(pte);
+			spin_unlock(&mm->page_table_lock);
+			return VM_FAULT_MINOR;
+		}
+		在第一种情况下，当页从未被访问或页线性地映射磁盘文件时则调用do_no_page()函数。
+		
+写时复制
+	第一代Unix系统实现了一种傻瓜式的进程创建：当发出fork()系统调用时，内核原样复制父进程的整个地址空间并把复制的那一份分配给子进程。这种行为非常耗时，因为它需要：
+		为子进程的页表分配页框
+		为子进程的页分配页框
+		初始化子进程的页表
+		把父进程的页复制到子进程相应的页中
+	现在的Unix内核（包括Linux）采用一种更为有效的方法，称为写时复制（Copy On Write，COW）。这种思想相当简单：父进程和子进程共享页框而不是复制页框。然后只要页框被共享，它们就不能被修改。无论父进程还是子进程何时试图写一个共享的页框，就产生一个异常，这是内核就把这个页复制到一个新的页框中并标记可写。原来的页框仍然是写保护的：当其他进程试图写入时，内核检查写进程是否是这个页框的唯一属主，如果是，就把这个页框标记为对这个进程可写。
+	
+处理非连续内存区访问
+	内核在更新非连续内存区对应的页表项时是非常懒惰的。事实上，vmalloc()和vfree()函数只把自己现在在更新主内核页表。
+	然而一旦内核初始化结束，任何进程或内核线程便都不直接使用主内核页表。因此，我们来考虑内核态进程对非连续内存区的第一次访问。当把线性地址转换为物理地址时，CPU的内存管理单元遇到空的页表项并产生一个缺页。但是缺页异常处理程序认识这种特殊的情况，因为异常发生在内核态且产生缺页的线性地址大于TASK_SIZE。
+	
+创建和删除进程的地址空间
+	创建进程的地址空间
+		当创建一个新的进程时内核调用copy_mm()函数。这个函数通过建立新进程的所有页表和内存描述符来创建进程的地址空间。
+			static int copy_mm(unsigned long clone_flags, struct task_struct * tsk)
+		通常，每个进程都有自己的地址空间，但是轻量级进程可以通过调用clone()函数来创建。这些轻量级进程共享同一地址空间，也就是说，允许它们对同一组页进行寻址。
+	删除进程的地址空间
+		当进程结束时，内核调用exit_mm()函数释放进程的地址空间。
+			void exit_mm(struct task_struct * tsk)
+		如果正在被终止的进程不是内核线程，exit_mm()函数就必须释放内存描述符和所有相关的数据结构。
+
+堆的管理
+	每个Unix进程都拥有一个特殊的线性区，这个线性区就是所谓的堆（heap），堆用于满足进程的动态内存请求。内存描述符的start_brk与brk字段分别限定了这个区的开始地址和结束地址。
+	进程可以使用下面的API来请求和释放动态内存：
+		malloc(size):请求size个字节的动态内存
+		calloc(n,size):请求含n个大小为size的元素的一个数组。
+		realloc(ptr,size):该表由前面的malloc()或calloc()分配内存区字段的大小。
+		free(addr):释放由malloc()和calloc()分配的其实地址为addr的线性区。
+		brk(addr):直接修改堆的大小。
+		sbrk(incr):类似于brk()

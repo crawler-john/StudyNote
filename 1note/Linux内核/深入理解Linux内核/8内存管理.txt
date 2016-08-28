@@ -1,0 +1,599 @@
+内存管理
+	RAM的某些部分永久的分配给内核，并用来存放内核代码以及静态内核数据结构。
+	RAM的其余部分称为动态内存（dynamic memory），这不仅是进程所需的宝贵资源，也是内核本身所需的宝贵资源。实际上，整个系统的性能取决于如何有效地管理动态内存。
+	因此，现在所有多任务操作系统都在尽力优化对动态内存的使用，也就是说，尽可能做到当需要时分配，不需要时释放。
+	
+页框管理
+	Linux采用4KB页框大小作为标准的内存分配单元。基于以下两个原因，这会使事情变得简单：
+		1、由分页单元引发的缺页异常很容易得到解释，或者是由于请求的页存在但是不允许进程对其访问，或者是由于请求的页不存在。在第二种情况下，内存分配器必须找到一个4KB的空闲页框，并将其分配给进程。
+		2、虽然4KB和4MB都是磁盘块大小的倍数，但是在绝大多数情况下，当主存和磁盘之间传输小块数据时更高效。
+	页描述符
+		内核必须记录每个页框当前的状态。例如，内核必须能区分哪些页框包含的是属于进程的页，而哪些页框包含的是内核代码或内核数据。
+		页框的状态信息保存在一个类型为page的页描述符中，所有页描述符存放在mem_map数组中，因此每个描述符长度为32字节，所以mem_map所需要的空间略小于整个RAM的1%。
+			virt_to_page(addr)宏产生线性地址addr对应的页描述符地址。
+			pfn_to_page(pfn)宏产生与页框号pfn对应的页描述符地址。
+		两个详细的字段：
+			 _count:页的引用计数器。如果该字段为-1，则相应页框空闲，并可被分配给任一进程或内核本身；如果该字段大于或等于0，则说明页框被分配给一个或多个进程，或用于存放一些内核数据结构。
+				page_count()函数返回_count加1后的值，也就是该页使用中的数量。
+			 flags:包含多达32个用来描述页框状态的标志。对于每个PG_xyz标志，内核都定义了操纵其值的一些宏。通常PageXyz宏返回标志的值，而SetPageXyz和ClearPageXyz宏分别设置和清除相应位。
+	非一致内存访问（NUMA）
+		Linux2.6支持非一致内存访问（NUMA）模型，在这种模型中，给定CPU对不同内存单元的访问时间可能不一样。
+		系统的物理内存被划分为几个节点（node）。在一个单独的节点内，任一给定CPU访问页面所需的事件都是相同的。
+	内存管理区
+		Linux2.6把每个内存节点的物理内存划分为3个管理区域（zone）。在80x86UMA体系结构中的管理区为：
+			ZONE_DMA:包含低于16MB的内存页框
+			ZONE_NORMAL:包含高于16MB且低于896MB的内存页框
+			ZONE_HIGHMEN:包含从896MB开始高于896MB的内存页框
+		ZONE_DMA和ZONE_NORMAL区包含内存的“常规”页框，通过把它们线性地映射到线性地址空间的第4个GB，内核就可以直接进行访问。相反，ZONE_HIGHMEN区包含的内存不能由内核直接访问，尽管它们也线性地映射到了线性地址空间的第4个GB。
+		每个内存管理区都有自己的描述符。
+		每个页描述符都有到内存节点和到节点内存管理区（包含相应页框的链接）。为了节省空间，这些链接的存放方式与典型的指针不同，而是被编码成索引存放在flags字段的高位。
+	保留的页框池
+		可以用两种不同的方法来满足内存分配的请求。如果有足够的空闲内存可用，请求就会被立刻满足。否则，必须回收一些内存，并且将发出请求的内核控制路径阻塞，直到有内存被释放。
+		不过，当请求内存时，一些内核控制路径不能被阻塞。例如：这种情况发生在处理中断或在执行临界区内代码时。在这种情况下，一条内核控制路径应当产生原子内存分配请求。原子请求从不阻塞：如没有足够的空闲页，则仅仅是分配失败而已。
+		内核为原子内存分配请求保留了一个页框池，只有在内存不足时使用。
+		保留内存的数量（以KB为单位）存放在min_free_kbytes变量中。
+	分页内存分配器
+		被称作分区页框分配器（zoned page frame allocator）的内核子系统，处理对连续页框组的内存分配请求。
+		名为“管理区分配器”部分接受动态内存分配与释放的请求。
+		为了达到更好的系统性能，一小部分页框保留在高速缓存中用于快速地满足对单个页框的分配请求。
+	请求和释放页框
+		可以通过6个稍有差别的函数和宏请求页框。一般情况下它们都返回第一个所分配页的线性地址，或者如果分配失败，则返回NULL；
+			alloc_pages(gfp_mask,order):用这个函数请求2的order次方个连续的页框。返回第一个所分配页框描述符的线性地址，或者如果分配失败，则返回NULL；
+			alloc_page(gfp_mask):用于获取一个单独的页框宏
+			__get_free_pages(gfp_mask,order):类似于alloc_pages(gfp_mask,order)
+			__get_free_page(gfp_mask):用于获取一个单独的页框宏
+			get_zeroed_page(gfp_mask):用来获取填满0的页框
+			__get_dma_pages(gfp_mask,order):用这个宏获得适当于DMA的页框。
+			参数gfp_mask是一组标志，它指明了如何寻找空闲的页框。
+		下面4个函数和宏中的任一个都可以释放页框
+			__free_pages(page,order):该函数线检查page指向的页描述符，如果该也描述符未被保留，就把描述符的count字段减1，如果count值变为0，就假定从与page对应的页框开始的2的order次方个连续页框不在被使用。
+			free_pages(addr,order):与上面的函数相同，但是它接受的参数为要释放的第一个页框的线性地址addr。
+			__free_page(page):这个宏释放page所指描述符对应的页框
+			free_page(addr):该宏释放线性地址为addr的页框。
+	高端内存页框的内存映射
+		与直接映射的物理内存末端、高端内存的始端所对应的线性地址存放在high_memory变量中，它被设置为896MB。896MB边界以上的页框并不映射在内核线性地址空间的第4个GB，因此，内核不能直接访问他们。这就意味着，返回所分配页框线性地址的页分配器函数不适用于高端内存，即不适用于ZONE_HIGHMEN内存管理区内的页框。
+		在64位硬件平台上不存在这些问题。但是在32位平台上，Linux设计者不得不找到某种方法来允许内核使用所有可使用的RAM，达到PAE所支持的64GB。采用方法如下：
+			高端内存页框的分配只能通过alloc_pages()函数和它的快捷函数alloc_page()。这些函数不返回第一个被分配页框的线性地址，因为如果该页框属于高端内存，那么这样的线性地址根本不存在。取而代之，这些函数返回第一个被分配页框的页描述符的线性地址。这些线性地址总是存在的，因为所有页描述符一旦被分配在低端内存中，它们在内核初始化阶段就不变。
+			没有线性地址的高端内存中的页框不能被内核访问。因此，内核线性地址空间的最后128MB中的一部分专门用于映射高端内存页框。当然这种映射是暂时的，否则只有128MB的高端内存可以被访问。取而代之，通过重复使用线性地址，使得整个高端内存能够在不同的时间被访问。
+		内核可以采用三种不同的机制将页框映射到高端内存；分别叫做永久内核映射、临时内核映射以及非连续内存映射。
+		建立永久内核映射可能阻塞当前进程；这发生在空闲页表项不存在时，也就是在高端内存上没有页表项可以作为页框的窗口时。因此，永久内核映射不能作用于中断处理程序和可延迟函数。
+		相反，建立临时内核映射决不会要求阻塞当前进程。不过他的缺点是只有很少的临时内核映射可以同时建立起来。
+	永久内核映射
+		永久内核映射允许内核建立高端页框到内核地址空间的长期映射。它们使用主内核页表中的一个专门的页表，其地址存放在pkmap_page_table变量中。页表中的表项数由LAST_PKMAP宏产生。页表照样包含512或1024项，这取决于PAE是否被激活。因此内核一次最多访问2MB或4MB的高端内存。
+		该页表映射的线性地址从PKMAP_BASE开始。pkmao_count数组包含LAST_PKMAP个计数器，pkmap_page_table页表中的每一项都有一个。
+			计数器为0：对应的页表项没有映射任何高端内存页框，并且是可用的。
+			计数器为1：对应的页表项没有映射任何高端内存页框，但是它不能使用，因为自从它最后一次使用以来，其相应的TLB表现还未被刷新。
+			计数器为n（远大于1）：相应的页表项映射一个高端内存页框，这意味着正好有n-1个内核成分在使用这个页框。
+		page_address()函数返回页框对应的线性地址，如果页框在高端内存中并没有被映射、则返回NULL。这个函数接受一个页描述符指针page作为其参数。
+		kmap()函数建立永久内核映射。
+			void *kmap(struct page *page)
+			{
+				might_sleep();
+				if (!PageHighMem(page))
+					return page_address(page);
+				return kmap_high(page);
+			}
+			如果页框确实属于高端内存，则调用kmap_high()函数。
+			void fastcall *kmap_high(struct page *page)
+			{
+				unsigned long vaddr;
+
+				/*
+				 * For highmem pages, we can't trust "virtual" until
+				 * after we have the lock.
+				 *
+				 * We cannot call this from interrupts, as it may block
+				 */
+				spin_lock(&kmap_lock);					//保护页表免受多处理器系统上的并发访问。
+				vaddr = (unsigned long)page_address(page);
+				if (!vaddr)
+					vaddr = map_new_virtual(page);
+				pkmap_count[PKMAP_NR(vaddr)]++;
+				if (pkmap_count[PKMAP_NR(vaddr)] < 2)
+					BUG();
+				spin_unlock(&kmap_lock);
+				return (void*) vaddr;
+			}
+		kunmap()函数撤销先前由kmap()建立的永久内核映射。
+			void kunmap(struct page *page)
+			{
+				if (in_interrupt())
+					BUG();
+				if (!PageHighMem(page))
+					return;
+				kunmap_high(page);
+			}
+			如果页确实在高端内存中，则调用kunmap_high()函数。
+			void fastcall kunmap_high(struct page *page)
+			{
+				unsigned long vaddr;
+				unsigned long nr;
+				int need_wakeup;
+
+				spin_lock(&kmap_lock);
+				vaddr = (unsigned long)page_address(page);
+				if (!vaddr)
+					BUG();
+				nr = PKMAP_NR(vaddr);
+
+				/*
+				 * A count must never go down to zero
+				 * without a TLB flush!
+				 */
+				need_wakeup = 0;
+				switch (--pkmap_count[nr]) {
+				case 0:
+					BUG();
+				case 1:
+					/*
+					 * Avoid an unnecessary wake_up() function call.
+					 * The common case is pkmap_count[] == 1, but
+					 * no waiters.
+					 * The tasks queued in the wait-queue are guarded
+					 * by both the lock in the wait-queue-head and by
+					 * the kmap_lock.  As the kmap_lock is held here,
+					 * no need for the wait-queue-head's lock.  Simply
+					 * test if the queue is empty.
+					 */
+					need_wakeup = waitqueue_active(&pkmap_map_wait);
+				}
+				spin_unlock(&kmap_lock);
+
+				/* do wake-up, if needed, race-free outside of the spin lock */
+				if (need_wakeup)
+					wake_up(&pkmap_map_wait);
+			}
+	临时内核映射
+		临时内核映射比永久内核映射的实现要简单。此外，它们可以用在中断处理程序和可延迟函数的内部，因为它们从不阻塞当前进程。
+		在高端内存的任一页框都可以通过一个“窗口”（为此而保留的一个页表项）映射到内核地址空间。留给临时内核映射的窗口数是非常少的。
+		每个CPU都有它自己包含13个窗口集合，它们用enum km_type数据结构表示。
+		内核必须确保同一窗口永不会被两个不同的控制路径同时使用。
+		为了建立临时内核映射，内核调用kmap_atomic()函数，
+			void *kmap_atomic(struct page *page, enum km_type type)
+			{
+				enum fixed_addresses idx;
+				unsigned long vaddr;
+
+				/* even !CONFIG_PREEMPT needs this, for in_atomic in do_page_fault */
+				inc_preempt_count();
+				if (!PageHighMem(page))
+					return page_address(page);
+
+				idx = type + KM_TYPE_NR*smp_processor_id();
+				vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
+			#ifdef CONFIG_DEBUG_HIGHMEM
+				if (!pte_none(*(kmap_pte-idx)))
+					BUG();
+			#endif
+				set_pte(kmap_pte-idx, mk_pte(page, kmap_prot));
+				__flush_tlb_one(vaddr);
+
+				return (void*) vaddr;
+			}
+		为了撤销临时内核映射，内核使用kunmap_atomic()函数。
+		
+伙伴系统算法
+	内核应该为分配一组连续的页框而建立一种健壮、高效的分配策略。频繁的请求和释放不同大小的一组连续页框，必然导致在已分配页框的块内分散了许多小块的空闲页框。
+	从本质上说，避免外碎片的方法有两种：
+		利用分页单元把一组非连续的空闲页框映射到连续的线性地址区间。
+		开发一种适当的技术来记录现存的空闲连续页框块的情况，以尽量避免为满足对小块的请求而分割大的空闲块。（内核选用这种方法）
+	Linux采用著名的伙伴算法（buddy system）算法来解决碎片问题。把所有的空闲页框分组为11个块链表，每个链表分别包含大小为1,2,4,8,16,32,64,128,256,512和1024个连续的页框。对1024个页框的最大请求对应着4MB大小的连续RAM。每个块的第一个页框的物理地址是该块大小的整数倍。
+	数据结构：
+		Linux2.6位每个管理区使用不同的伙伴系统。因此在80x86结构中，由三种伙伴系统：第一种处理适合ISA DMA的页框，第二种处理“常规”页框，第三种处理高端内存页框。每个伙伴系统使用的主要数据结构如下：
+			前面介绍过的mem_map数组。
+			包含有11个元素、元素类型为free_area的一个数组，每个元素对应一种块的大小。该数组存放在管理区描述符的free_area字段中。
+	分配块
+		__rmqueue()函数用来在管理区中找到一个空闲块。
+			static struct page *__rmqueue(struct zone *zone, unsigned int order)//参数：管理区描述符地址；请求的空闲页块大小的对数值
+			__rmqueue()函数假设调用者已经禁止了本地中断并获得了保护伙伴系统数据结构的zone->lock自旋锁。
+	释放块
+		__free_pages_bulk()函数按照伙伴系统的策略释放页框。
+			static inline void __free_pages_bulk (struct page *page, struct page *base, struct zone *zone, unsigned int order)
+				//参数：被释放块中所包含的第一个页框描述符的地址；管理区描述符地址；块大小的对数。
+			这函数假设调用者已经禁止了本地中断并获得了保护伙伴系统数据结构的zone->lock自旋锁。
+			
+每CPU页框高速缓存
+	内核经常请求和释放单个页框。为了提升系统性能，每个内存管理区定义了一个“每CPU”页框高速缓存。所有“每CPU”高速缓存包含一些预先分配的页框，它们被用于满足本地CPU发出的单一内存请求。
+	实际上，这里为每个内存管理区和每个CPU提供两个高速缓存：
+		一个热高速缓存，它存放的页框中所包含的内容很可能就在CPU硬件高速缓存中；
+		还有一种冷高速缓存。
+	通过每cpu页框高速缓存分配页框
+		buffered_rmqueue()函数在指定的内存管理区中分配页框。它使用每cpu页框高速缓存来处理单一页框请求。
+			static struct page *buffered_rmqueue(struct zone *zone, int order, int gfp_flags)
+	释放页框到每CPU页框高速缓存
+		为了释放单个页框到每CPU页框高速缓存，内核使用free_hot_page()和free_cold_page()函数。它们都是free_hot_cold_page()函数的简单封装，接受的参数为将要释放的页框的描述符地址page和cold标志（指定是热高速缓存还是冷高速缓存）。
+			static void fastcall free_hot_cold_page(struct page *page, int cold)
+			{
+				struct zone *zone = page_zone(page);
+				struct per_cpu_pages *pcp;
+				unsigned long flags;
+
+				arch_free_page(page, 0);
+
+				kernel_map_pages(page, 1, 0);
+				inc_page_state(pgfree);
+				if (PageAnon(page))
+					page->mapping = NULL;
+				free_pages_check(__FUNCTION__, page);
+				pcp = &zone->pageset[get_cpu()].pcp[cold];
+				local_irq_save(flags);
+				if (pcp->count >= pcp->high)
+					pcp->count -= free_pages_bulk(zone, pcp->batch, &pcp->list, 0);
+				list_add(&page->lru, &pcp->list);
+				pcp->count++;
+				local_irq_restore(flags);
+				put_cpu();
+			}
+
+管理区分配器
+	管理区分配器是内核页框分配器的前端。该成分必须分配一个包含足够多空闲页框的内存管理区，使它能满足内存请求。管理区分配器必须满足几个目标：
+		它应当保护保留的页框池。
+		当内存不足且允许阻塞当前进程时，它应当触发页框回收算法；一旦某个页框被释放，管理区分配器将再次尝试分配。
+		如果可能，它应当保存小而珍贵的ZONE_DMA内存管理区。
+		struct page * fastcall
+		__alloc_pages(unsigned int gfp_mask, unsigned int order,
+				struct zonelist *zonelist)		//分配内存相关函数
+		{
+			const int wait = gfp_mask & __GFP_WAIT;
+			struct zone **zones, *z;
+			struct page *page;
+			struct reclaim_state reclaim_state;
+			struct task_struct *p = current;
+			int i;
+			int classzone_idx;
+			int do_retry;
+			int can_try_harder;
+			int did_some_progress;
+
+			might_sleep_if(wait);
+
+			/*
+			 * The caller may dip into page reserves a bit more if the caller
+			 * cannot run direct reclaim, or is the caller has realtime scheduling
+			 * policy
+			 */
+			can_try_harder = (unlikely(rt_task(p)) && !in_interrupt()) || !wait;
+
+			zones = zonelist->zones;  /* the list of zones suitable for gfp_mask */
+
+			if (unlikely(zones[0] == NULL)) {
+				/* Should this ever happen?? */
+				return NULL;
+			}
+
+			classzone_idx = zone_idx(zones[0]);
+
+		 restart:
+			/* Go through the zonelist once, looking for a zone with enough free */
+			//执行对内存管理区的第一次扫描
+			for (i = 0; (z = zones[i]) != NULL; i++) {
+
+				if (!zone_watermark_ok(z, order, z->pages_low,
+							   classzone_idx, 0, 0))
+					continue;
+
+				page = buffered_rmqueue(z, order, gfp_mask);
+				if (page)
+					goto got_pg;
+			}
+			//如果函数在上一步没有终止，那么没有剩余多少空闲内存:函数唤醒kswapd内核线程来异步的开始回收页框
+			for (i = 0; (z = zones[i]) != NULL; i++)
+				wakeup_kswapd(z, order);
+
+			/*
+			 * Go through the zonelist again. Let __GFP_HIGH and allocations
+			 * coming from realtime tasks to go deeper into reserves
+			 */
+			 //执行对内存的第二次扫描，将z->pages_min作为阈值base传递。
+			for (i = 0; (z = zones[i]) != NULL; i++) {
+				if (!zone_watermark_ok(z, order, z->pages_min,
+							   classzone_idx, can_try_harder,
+							   gfp_mask & __GFP_HIGH))
+					continue;
+
+				page = buffered_rmqueue(z, order, gfp_mask);
+				if (page)
+					goto got_pg;
+			}
+
+			/* This allocation should allow future memory freeing. */
+			if (((p->flags & PF_MEMALLOC) || unlikely(test_thread_flag(TIF_MEMDIE))) && !in_interrupt()) {
+				/* go through the zonelist yet again, ignoring mins */
+				for (i = 0; (z = zones[i]) != NULL; i++) {
+					page = buffered_rmqueue(z, order, gfp_mask);
+					if (page)
+						goto got_pg;
+				}
+				goto nopage;
+			}
+
+			/* Atomic allocations - we can't balance anything */
+			if (!wait)
+				goto nopage;
+
+		rebalance:
+			//检查是否有其他进程需要CPU
+			cond_resched();
+
+			/* We now go into synchronous reclaim */
+			//时至current的PF_MEMALLOC标志来表示进程已经准备好执行内存回收
+			p->flags |= PF_MEMALLOC;
+			reclaim_state.reclaimed_slab = 0;
+			p->reclaim_state = &reclaim_state;
+			//寻找一些页框来回收
+			did_some_progress = try_to_free_pages(zones, gfp_mask, order);
+
+			//将一个指向reclaim_state数据结构的指针存入current->reclaim_state
+			p->reclaim_state = NULL;
+			p->flags &= ~PF_MEMALLOC;
+
+			cond_resched();
+
+			if (likely(did_some_progress)) {
+				/*
+				 * Go through the zonelist yet one more time, keep
+				 * very high watermark here, this is only to catch
+				 * a parallel oom killing, we must fail if we're still
+				 * under heavy pressure.
+				 */
+				for (i = 0; (z = zones[i]) != NULL; i++) {
+					if (!zone_watermark_ok(z, order, z->pages_min,
+								   classzone_idx, can_try_harder,
+								   gfp_mask & __GFP_HIGH))
+						continue;
+
+					page = buffered_rmqueue(z, order, gfp_mask);
+					if (page)
+						goto got_pg;
+				}
+			} else if ((gfp_mask & __GFP_FS) && !(gfp_mask & __GFP_NORETRY)) {
+				/*
+				 * Go through the zonelist yet one more time, keep
+				 * very high watermark here, this is only to catch
+				 * a parallel oom killing, we must fail if we're still
+				 * under heavy pressure.
+				 */
+				for (i = 0; (z = zones[i]) != NULL; i++) {
+					if (!zone_watermark_ok(z, order, z->pages_high,
+								   classzone_idx, 0, 0))
+						continue;
+
+					page = buffered_rmqueue(z, order, gfp_mask);
+					if (page)
+						goto got_pg;
+				}
+
+				out_of_memory(gfp_mask);
+				goto restart;
+			}
+
+			/*
+			 * Don't let big-order allocations loop unless the caller explicitly
+			 * requests that.  Wait for some write requests to complete then retry.
+			 *
+			 * In this implementation, __GFP_REPEAT means __GFP_NOFAIL for order
+			 * <= 3, but that may not be true in other implementations.
+			 */
+			do_retry = 0;
+			if (!(gfp_mask & __GFP_NORETRY)) {
+				if ((order <= 3) || (gfp_mask & __GFP_REPEAT))
+					do_retry = 1;
+				if (gfp_mask & __GFP_NOFAIL)
+					do_retry = 1;
+			}
+			if (do_retry) {
+				blk_congestion_wait(WRITE, HZ/50);
+				goto rebalance;
+			}
+
+		nopage:
+			if (!(gfp_mask & __GFP_NOWARN) && printk_ratelimit()) {
+				printk(KERN_WARNING "%s: page allocation failure."
+					" order:%d, mode:0x%x\n",
+					p->comm, order, gfp_mask);
+				dump_stack();
+			}
+			return NULL;
+		got_pg:
+			zone_statistics(zonelist, z);
+			return page;
+		}
+	释放一组页框：
+		管理区分配器同样负责释放页框；幸运的是，释放内存比分配它要简单得多。
+			fastcall void __free_pages(struct page *page, unsigned int order)
+			{	//检查第一个页框是否真正属于动态内存；如果不是，则终止。
+				//减少page->count使用计数器值；如果它仍然大于或等于0，则终止。
+				if (!PageReserved(page) && put_page_testzero(page)) {
+					if (order == 0)
+						free_hot_page(page);
+					else
+						__free_pages_ok(page, order);
+				}
+			}
+
+内存区管理
+	伙伴系统算法采用页框作为基本内存区，这适合于对大块内存的请求，但我们如何处理对小内存的请求呢，比如说几十或几百个字节？
+		显然，如果为了存放很少的字节而给它分配整个页框，这显然是一种浪费。取而代之的正确方法就是引入一种新的数据结构来描述在同一页框中如何分配小内存区。
+		但是这样页引入了一个新的问题，即所谓的内碎片。内碎片的产生主要是由于请求内存的大小与分配给它的大小不匹配造成的。
+	一种典型的解决方法就是提供按几何分布的内存区大小，换句话说，内存区大小取决于2的幂而不取决于所存放的数据大小。
+	slab分配器
+		在伙伴系统算法之上运行内存区分配算法没有显著的效率。一种更好的算法源自slab分配器模式。这个算法基于下列前提：
+			1、所存放数据类型可以影响内存区的分配方式。
+			2、内核函数倾向于反复请求同一类型的内存。
+			3、对内存区的请求可以根据他们发生的频率来分类。
+			4、在引用的对象大小不是几何分布的情况下，也就是说数据结构的起始地址不是物理地址值的2的幂次方，事情反而好办。这可以借助处理器硬件高速缓存而导致较好的性能。
+			5、硬件高速缓存的高性能优势尽可能地限制对伙伴系统分配器调用的另一种理由，因为对伙伴系统函数的每次调用都“弄脏”硬件高速缓存，所有增加了对内存的平均访问时间。
+		slab分配器把对象分组放进高速缓存。每个高速缓存都是同样类型对象的一种”存储“。
+		包含高速缓存的主内存区被划分为多个slab，每个slab由一个或多个连续的页框组成，这些页框中即包含已分配的对象，也包含空闲的对象。
+	高速缓存描述符
+		每个高速缓存都是由kmem_cache_t类型的数据结构来描述的。
+			struct kmem_cache_s {
+			/* 1) per-cpu data, touched during every alloc/free */
+				struct array_cache	*array[NR_CPUS];	//每CPU指针数组指向包含空闲对象的本地高速缓存
+				unsigned int		batchcount;			//要转移出本地高速缓存或本地高速缓存中转移出的大批量对象的数量
+				unsigned int		limit;				//本地高速缓存中空闲对象的最大数量。
+			/* 2) touched by every alloc & free from the backend */
+				struct kmem_list3	lists;				//见下面的结构体
+				/* NUMA: kmem_3list_t	*nodelists[MAX_NUMNODES] */
+				unsigned int		objsize;			//高速缓存包含的对象大小。
+				unsigned int	 	flags;	/* constant flags */		//描述高速缓存永久属性的一组标志
+				unsigned int		num;	/* # of objs per slab */	//封装在一个单独slab中的对象个数
+				unsigned int		free_limit; /* upper limit of objects in the lists */	//整个slab高速缓存中空闲对象的上限
+				spinlock_t		spinlock;		//高速缓存自旋锁
+
+			/* 3) cache_grow/shrink */
+				/* order of pgs per slab (2^n) */
+				unsigned int		gfporder;	//一个单独slab中包含的连续页框的数目的对数
+
+				/* force GFP flags, e.g. GFP_DMA */
+				unsigned int		gfpflags;	//分配页框是传递给伙伴系统函数的一组标志
+
+				size_t			colour;		/* cache colouring range */	//slab中使用的颜色的个数
+				unsigned int		colour_off;	/* colour offset */		//slab中的基本对齐偏移
+				unsigned int		colour_next;	/* cache colouring */	//下一个被分配的slab使用的颜色
+				kmem_cache_t		*slabp_cache;		//指针指向包含slab描述符的普通slab高速缓存
+				unsigned int		slab_size;		//单个slab的大小
+				unsigned int		dflags;		/* dynamic flags */	//描述高速缓存动态属性的一组标志
+
+				/* constructor func */
+				void (*ctor)(void *, kmem_cache_t *, unsigned long);	//指向高速缓存相关构造方法的指针
+
+				/* de-constructor func */
+				void (*dtor)(void *, kmem_cache_t *, unsigned long);	//指向高速缓存相关析构方法的指针
+
+			/* 4) cache creation/removal */
+				const char		*name;	//存放高速缓存名字的字符数组
+				struct list_head	next;	//高速缓存描述符双向链表使用的指针
+			};
+			struct kmem_list3 {
+				struct list_head	slabs_partial;	/* partial list first, better asm code */
+				struct list_head	slabs_full;
+				struct list_head	slabs_free;
+				unsigned long	free_objects;
+				int		free_touched;
+				unsigned long	next_reap;
+				struct array_cache	*shared;
+			};
+	slab描述符
+		高速缓存中的每个slab都由自己的类型为slab的描述符。
+		slab描述符可以存放在两个可能的地方：
+			外部slab描述符：存放在slab外部，位于cache_sizes指向的一个不合适ISA DMA的普通高速缓存中
+			内部slab描述符：存放在slab内部，位于分配给slab的第一个页框的其实位置。
+	普通和专用高速缓存
+		高速缓存被分为两种类型：普通和专用。
+			普通高速缓存只由slab分配器用于自己的目的。
+			专用高速缓存由内核的其余部分使用。
+		普通高速缓存是：
+			1、第一个高速缓存叫做kmem_cache，包含由内核使用的其余高速缓存的高速缓存描述符。cache_cache变量包含第一个高速缓存的描述符。
+			2、另一些高速缓存包含用作普通用途的内存区。内存区大小的范围一般包含13个几何分布的内存区。一个叫做malloc_sizes的表分别指向26个高速缓存描述符。对于每一种大小，都由两种高速缓存：一种适合于ISA DMA分配，另一种适合于常规分配。
+		系统在初始化阶段调用kmem_cache_init()和kmem_cache_sizes_init()来建立普通高速缓存。
+		专用高速缓存是由kmem_cache_create()函数创建的。这个函数首先根据参数确定处理新高速缓存的最佳方法。然后它从cache_cache普通高速缓存中为新的高速缓存分配一个高速缓存描述符，并把这个描述符插入到高速缓存描述符的cache_chain链表中。
+			kmem_cache_t *
+			kmem_cache_create (const char *name, size_t size, size_t align,
+				unsigned long flags, void (*ctor)(void*, kmem_cache_t *, unsigned long),
+				void (*dtor)(void*, kmem_cache_t *, unsigned long))
+		还有可以调用kmem_cache_destroy()撤销一个高速缓存并将它从cache_chain链表中删除。这个函数用于模块中，即模块转入时创建自己的高速缓存，卸载时撤销高速缓存。
+			int kmem_cache_destroy (kmem_cache_t * cachep)
+	slab分配器与分区页框分配器的接口
+		当slab分配器创建新的slab时，它依靠分区页框分配器来获得一组连续的空闲页框。未达到这个目的，它调用下面的函数。
+			static void *kmem_getpages(kmem_cache_t *cachep, int flags, int nodeid)	//参数：1指向需要额外页框的高速缓存的高速缓存描述符 2说明如何请求页框
+	给高速缓存分配slab
+		一个新创建的高速缓存没有包含任何slab，因此也没有空闲的对象，只有当以下两个条件为真时，才能给高速缓存分配slab：
+			1.已发出一个分配新对象的请求
+			2.高速缓存不包含任何空闲对象
+	从高速缓存中释放slab
+		在两种条件下才能撤销slab：
+			slab高速缓存中有太多的空闲对象
+			被周期性调用的定时器函数确定是否有完全未使用的slab能被释放。
+	对象描述符
+		每个对象都由类型为kmem_bufctl_t的一个描述符。对象描述符存放在一个数组中，位于相应的slab描述符之后。因此，与slab描述符本身类似，slab的对象描述符也可以用两种可能的方式存放，
+			外部对象描述符：存放在slab的外面，位于高速缓存描述符的slabp_cache字段指向的一个普通高速缓存中。内存区的大小取决于在slab中存放的对象个数。
+			内部对象描述符：存放在slab内部，正好位于描述符所描述的对象之前。
+		数组中的第一个对象描述符slab中的第一个对象，它包含的是下一个空闲对象在slab中的下标，因此实现slab内部空闲对象的一个简单链表。空闲对象链表中最后一个元素的对象描述符用常规值BUFCTL_END（0xffff）标记。
+	对其内存对象
+		slab分配器所管理的对象可以在内存中进行对齐，也就是说，存放它们的内存单元的其实物理地址是一个给定常量的倍数，通常是2的倍数。这个常量就叫对其因子。
+		通常情况下，如果内存单元的物理地址是字大小对齐的，那么，微机对内存单元的存取会非常快。因此，缺省情况下，kmem_cache_create()函数根据BYTES_PER_WORD宏所指定的字大小来对其对象。
+	slab着色
+		不同的硬件高速缓存行可以映射RAM中很多不同块。slab分配器通过一种叫做slab着色的策略，尽量降低高速缓存的这种不愉快行为：把叫做颜色（color）的不同随机数分配给slab。
+		slab分配器利用空闲未用的字节free来对slab着色。术语“着色”只是用来再细分slab、并运行内存分配器把对象展开在不同的线性地址之中。这样的话，内核从微处理器的硬件高速缓存中可能获得很好的性能。
+	空闲Slab独享的本地高速缓存	
+		为了减少处理器之间对自旋锁的竞争和更好地利用硬件高速缓存，slab分配器的每个高速缓存包含一个被称作slab本地高速缓存的每CPU数据结构，该结构由一个指向被释放对象的小指针数组组成。
+		高速缓存描述符的array字段是一组指向array_cache数据结构的指针，系统中的每一个CPU对应于一个元素。每个array_cache数据结构是空闲对象的本地高速缓存的一个描述符。
+			struct array_cache {
+				unsigned int avail;		//指向本地高速缓存中可使用对象的指针个数
+				unsigned int limit;		//本地高速缓存的大小，也就是本地高速缓存中指针的最大个数
+				unsigned int batchcount;//本地高速缓存重新填充或腾空时使用的块大小
+				unsigned int touched;	//如果本地高速缓存最近已经被使用过，则该标志设为1
+			};
+		注意：本地高速缓存描述符不包含本地高速缓存本身的地址。事实上，它正好位于描述符之后。
+	分配slab对象
+		通过调用kmem_cache_alloc()函数可以获得新对象。
+			void * kmem_cache_alloc (kmem_cache_t *cachep, int flags)	//参数：1指向高速缓存描述符，新空闲对象必须从该高速缓存描述符获得，而参数flag表示传递给分区页框分配器函数的标志，该高速缓存的所有slab应当是满的。
+			static inline void * __cache_alloc (kmem_cache_t *cachep, int flags)
+			{
+				unsigned long save_flags;
+				void* objp;
+				struct array_cache *ac;
+
+				cache_alloc_debugcheck_before(cachep, flags);
+
+				local_irq_save(save_flags);
+				ac = ac_data(cachep);
+				if (likely(ac->avail)) {
+					STATS_INC_ALLOCHIT(cachep);
+					ac->touched = 1;
+					objp = ac_entry(ac)[--ac->avail];
+				} else {
+					STATS_INC_ALLOCMISS(cachep);
+					objp = cache_alloc_refill(cachep, flags);	//函数重新填充本地高速缓存并获得一个空闲对象。
+				}
+				local_irq_restore(save_flags);
+				objp = cache_alloc_debugcheck_after(cachep, flags, objp, __builtin_return_address(0));
+				return objp;
+			}
+	释放slab对象
+		kmem_cache_free()函数释放一个曾经由slab分配器分配给某个内核函数的对象。
+			void kmem_cache_free (kmem_cache_t *cachep, void *objp)	//参数：1高速缓存描述符的地址，2被释放对象的地址。
+	普通对象
+		如果对存储区的请求不频繁，就用一组普通高速缓存来处理，普通高速缓存中的对象具有集合分布的大小。
+			调用kmalloc()函数可以得到这种类型的对象。
+			该函数使用malloc_sizes()表为所请求的大小分配最近的2的幂次方大小的内存。然后调用kmem_cache_alloc()分配对象，传递的参数或者为适用于ISA DMA页框高速缓存描述符，或者为适合于“”常规页框高速缓存描述符，这取决于调用者是否指定了__GFP_DMA。
+			调用kmalloc()的对象可以通过调用kfree()来释放。
+	内存池
+		基本上讲，一个内存池运行一个内核成分，如块设备子系统，仅在内存不足的紧急情况下分配一些动态内存来使用。
+		不要将内存池和前面的“保留的页框池”一节中描述的保留页框混淆。
+			实际上这些页框只能用于满足中断处理程序或内部临界区发出的原子内存分配请求。
+			内存池是动态内存的存储，只能被特定的内核成分（即池的“拥有者”）使用。
+			拥有者通常不使用储备；但是，如果动态内存变得极其稀有以至于所有普通内存分配请求都将失败的话，那么作为最后的解决手段，内核成分就能调用特定的内存池函数提取储备得到所需的内存。
+		一般而言，内存池能被用来分配任何一种类型的动态内存，从整个页框到使用kmalloc()分配的小内存区。因此，我们一般将内存池处理的内存单元看作“内存元素”
+		内存池由mempool_t对象描述：
+			spinlock_t			lock 				用来保护对象字段的自旋锁
+			int					min_nr				内存池元素的最大个数
+			int					curr_nr				当前内存池中元素的个数
+			void **				elements			指向一个数组的指针
+			void * 				pool_data			池的拥有者可获得私有数据
+			mempool_alloc_t *	alloc				分配一个元素的方法
+			mempool_free_t *	free				释放一个元素的方法
+			wait_queue_head_t	wait				当内存池为空时使用的等待队列
+		min_nr字段存放了内存池中元素的初始个数。换句话说，存放在该字段中的值代表了内存元素的个数，内存池的拥有者确信能从内存分配器得到这个数目。
+		mempool_create()函数创建一个新的内存池；它接收的参数为内存元素的个数min_nr、实现alloc和free方法的函数的地址和赋给pool_data字段的任意值。
+		
+非连续内存区管理
+	从前面，我们可以知道，把内存区映射到一组连续的页框是最好的选择，这样会充分利用高速缓存并获得较低的平均访问时间。不过，如果对内存区的请求不是很频繁，那么，通过连续的线性地址来访问非连续的页框这样一种分配模式会很有意义。
+	这种模式的主要优点是避免了外碎片，而缺点是必须打乱内核页表。
+	非连续的内存区的线性地址
+		要查找线性地址的一个空闲区，我们就可以从PAGE_OFFSET开始查找（通常为oxc0000000，即第4个GB的起始地址）如何使用第4个GB的线性地址：
+			内存区的开始部分包含的是对前896MB RAM精心映射的线性地址；直接映射的物理内存末尾所对应的线性地址保存在hign_memory变量中。
+			内存区的结尾部分包含的是固定映射的线性地址。
+			从PKMAP_BASE开始，我们查找用于高端内存页框的永久内核映射的线性地址。
+			其余的线性地址可以用于非连续内存区。
+	非连续内存区的描述符
+		每个非连续内存区都对应着一个类型为vm_struct的描述符。
+		get_vm_area()函数在线性地址VMALLOC_START和VMALLOC_END查找一个空闲区域。该函数使用两个参数：将被创建的内存区的字节大小（size）和指定空闲区类型的标志（flag）
+			struct vm_struct *get_vm_area(unsigned long size, unsigned long flags)；
+	分配非连续内存区
+		vmalloc()函数给内核分配一个非连续内存区。参数size表示所请求内存区的大小。如果这个函数能满足请求，就返回新内存区的其实地址；否则，返回一个NULL指针。
+			void *vmalloc(unsigned long size)
+	释放非连续内存区
+		vfree()函数释放vmalloc()或vmalloc32()创建的非连续内存区，而vunmap()函数释放vmap()创建的内存区。
+		

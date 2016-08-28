@@ -1,0 +1,194 @@
+信号
+	信号在最早的Unix系统中即被引用，用于在用户态进程间通信。内核也用信号通知进程系统所发生的事件。信号已有30多年的历史，但只有很小的变化。
+	
+信号的作用
+	信号（signal）是很短的消息，可以被发送到一个进程或一组进程。发送给进程的唯一信息通常是一个数，以此来标识信号。在标准信号中，对参数、信息或者其他相随的信息没有给与关注。
+	名字前缀为SIG的一组宏用来标识信号。
+	使用信号的两个主要目的是：
+		让进程知道已经发生了一个特定的事件。
+		强迫进程执行它自己代码中的信号处理程序。
+	当然这两个目的不是互斥的，因为进程经常通过执行一个特定的例程来对某一时间做出反应。
+	信号的一个重要特点是它们可以随时被发送给状态经常不可预知的进程。发送给非运行进程的信号必须由内核保存，知道进程恢复执行。阻塞一个信号要求信号的传递延迟，知道随后解除阻塞，这使得信号产生一段时间之后才能对其传递这一问题变得更加严重。
+	因此，内核区分信号传递的两个不同阶段：
+		信号产生：内核更新目标进程的数据结构以表示一个新信号已被发送。
+		信号传递：内核强迫目标进程通过以下方式对信号做出反应：或改变目标进程的执行状态，或开始执行一个特定的信号处理程序，或两者都是。
+	每个所产生的信号至多被传递一次。信号是可消费资源：一旦他们已传递出去，进程描述符中有关这个信号的所有信息都被取消。
+	已经产生但还没有传递的信号称为挂起信号（pending signal）。任何时候，一个进程仅存在给定类型的一个挂起信号，同一进程同种类型的其他信号不被排队，只被简单地丢弃。但是，实时信号是不同的：同样类型的挂起信号可以有好几个。
+
+	传递信号之前所执行的操作
+		进程以三种方式对一个信号做出应答：
+			1.显式地忽略信号。
+			2.执行与信号相关的缺省操作。
+			3.通过调用相应的信号处理函数捕获信号
+		如果信号传递会引起内核杀死一个进程，那么这个信号对该进程就是致命的。
+		
+	POSIX信号和多线程应用
+		POSIX 1003.1标准对多线程应用的信号处理有一些严格的要求；
+			信号处理程序必须在多线程应用的所有线程之间共享；不过，每个线程必须有自己的挂起信号掩码和阻塞信号掩码。
+			POSIX库函数kill()和sigqueue()必须向所有的多线程应用而不是某个特殊的线程发送信号。所有由内核产生的信号同样如此。
+			每个发送给多线程应用的信号仅传送给一个线程，这个线程是由内核在从不阻塞该信号的线程中随意选择出来的。
+			如果想多线程应用发送一个致命的信号，那么内核将杀死该应用的所有线程，而不仅仅是杀死接收信号的那个线程。
+
+	与信号相关的数据结构
+		与信号处理相关的进程描述符中的字段
+			struct signal_struct *           	signal			指向进程的信号描述符的指针			
+			struct sighand_struct *				sighand			指向进程的信号处理程序描述符的指针
+			sigset_t							blocked			被阻塞信号的掩码
+			sigset_t							real_blocked	被阻塞信号的临时掩码
+			struct sigpending					pending			存放私有挂起信号的数据结构
+			unsigned long						sas_ss_sp		信号处理程序备用堆栈的地址
+			size_t								sas_ss_size		信号处理程序备用堆栈的大小
+			int (*)(void *)						notifier		指向一个函数的指针，设备驱动程序用这个函数阻塞进程的某些信号
+			void *								notifier_data	指向notifier函数可能使用的数据
+			sigset_t *							notifier_mask	设备驱动程序通过notifier函数所阻塞的信号的位掩码
+		信号描述符和信号处理程序描述符
+			进程描述符的signal字段指向信号描述符（signal descriptor）：一个signal_struct类型的结构，用来跟踪共享挂起信号。
+				struct signal_struct {
+					atomic_t		count;	//信号描述符使用计数器
+					atomic_t		live;	//线程组中活动进程的数量
+
+					wait_queue_head_t	wait_chldexit;	/* for wait4() */ //在系统调用wait4()中睡眠的进程的等待队列
+
+					/* current thread group signal load-balancing target: */
+					task_t			*curr_target;		//接收信号的线程组中最后一个进程的描述符
+
+					/* shared signal handling: */
+					struct sigpending	shared_pending;	//存放共享挂起信号的数据结构
+
+					/* thread group exit support */
+					int			group_exit_code;	//线程组的进程终止代码
+					/* overloaded:
+					 * - notify group_exit_task when ->count is equal to notify_count
+					 * - everyone except group_exit_task is stopped during signal delivery
+					 *   of fatal signals, group_exit_task processes the signal.
+					 */
+					struct task_struct	*group_exit_task;	//在杀死整个线程组的时候使用
+					int			notify_count;				//在杀死整个线程组的时候使用
+
+					/* thread group stop support, overloads group_exit_code too */
+					int			group_stop_count;	//在停止整个线程组的时候使用
+					unsigned int		flags; /* see SIGNAL_* flags below */	//在传递修改进程状态的信号时使用的标志
+
+					/* POSIX.1b Interval Timers */
+					struct list_head posix_timers;
+
+					/* job control IDs */
+					pid_t pgrp;			//P所在进程组的领头进程PID
+					pid_t tty_old_pgrp;	//
+					pid_t session;		//
+					/* boolean value for session group leader */
+					int leader;
+
+					struct tty_struct *tty; /* NULL if no tty *//*与进程相关的tty*/
+
+					/*
+					 * Cumulative resource counters for dead threads in the group,
+					 * and for reaped dead child processes forked by this group.
+					 * Live threads maintain their own counters and add to these
+					 * in __exit_signal, except for the group leader.
+					 */
+					cputime_t utime, stime, cutime, cstime;
+					unsigned long nvcsw, nivcsw, cnvcsw, cnivcsw;
+					unsigned long min_flt, maj_flt, cmin_flt, cmaj_flt;
+
+					/*
+					 * We don't bother to synchronize most readers of this at all,
+					 * because there is no reader checking a limit that actually needs
+					 * to get both rlim_cur and rlim_max atomically, and either one
+					 * alone is a single word that can safely be read normally.
+					 * getrlimit/setrlimit use task_lock(current->group_leader) to
+					 * protect this instead of the siglock, because they really
+					 * have no need to disable irqs.
+					 */
+					struct rlimit rlim[RLIM_NLIMITS];
+				};
+			除了信号描述符以外，每个进程还引用一个信号处理程序描述符（signal handler deseriptor），它是一个sighand_struct类型的结构，用来描述每个信号必须怎样被线程组处理。
+				struct sighand_struct {
+					atomic_t		count;		//信号处理程序描述符的使用计数器
+					struct k_sigaction	action[_NSIG];	//说明在所传递信号上执行操作的结构数组
+					spinlock_t		siglock;	//保护信号描述符和信号处理程序描述符的自旋锁
+				};
+		sigaction数据结构
+			一些体系结构把特性赋给仅对内核可见的信号。
+				struct sigaction {
+					__sighandler_t sa_handler;	//指定要执行操作的类型。
+					unsigned long sa_flags;		//指定必须怎样处理信号。
+					__sigrestore_t sa_restorer;
+					sigset_t sa_mask;			//指定当运行信号处理程序时要屏蔽的信号。
+				};
+		挂起信号队列
+			为了跟踪当前的挂起信号是什么，内核把两个挂起信号队列与每个进程相关联：
+				共享挂起信号队列：位于信号描述符的shared_pending字段，存放整个线程组的挂起信号。
+				私有挂起信号队列：位于进程描述符的pending字段，存放特定进程（轻量级进程）的挂起信号。
+		
+	在信号数据结构上的操作
+		内核使用几个函数和宏来处理信号。
+	
+产生信号
+	很多内核函数都会产生信号：它们完成信号处理第一步的工作，即根据需要更新一个或多个进程的描述符。它们不执行第二步的信号传递操作，而是可能根据信号的类型和目标进程的状态唤醒一些进程，并促使这些进程接收信号。
+	specific_send_sig_info()函数向指定进程发送信号：
+		static int specific_send_sig_info(int sig, struct siginfo *info, struct task_struct *t)	//参数：1信号编号 2或为siginfo_t表的地址，或为三个特殊值中的一个 3指向目标进程描述符的指针
+	send_signal()函数在挂起信号队列中插入一个新元素，它接受信号编号sig、siginfo_t数据结构的地址info、目标进程描述符的地址t以及挂起信号队列的地址signals作为它的参数。
+		static int send_signal(int sig, struct siginfo *info, struct task_struct *t, struct sigpending *signals)
+	group_send_sig_info()函数向整个线程组发送信号。
+		int group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
+	
+传递信号
+	我们假设内核已注意到一个信号的到来，并调用之前所介绍的函数为接受此信号的进程准备描述符。但万一这个进程在那一刻并不在CPU上运行，内核就延迟传递信号的任务。
+	为了处理非阻塞的挂起信号，内核调用do_signal()函数：
+		int fastcall do_signal(struct pt_regs *regs, sigset_t *oldset)	//1栈区的地址，当前进程在用户态下寄存器的内容存放在这个栈中。2变量的地址，假设函数把阻塞信号的位掩码数组存放在这个变量中。
+	do_signal()函数的核心由重复调用dequeue_signal()函数的循环组成，直到在私有挂起信号队列和共享挂起信号队列中都没有非阻塞的挂起信号时，循环才结束。
+	dequeue_signal()函数首先考虑私有挂起信号队列中的所有信号，并从最低编号的挂起信号开始。
+
+	执行信号的缺省操作
+		如果ka->sa.sa_handler等于SIG_DFL，do_signal()就必须执行信号的缺省操作。唯一的例外是当接收进程是init时，在这种情况下，这个信号被丢弃。
+		
+	捕获信号
+		如果信号有一个专门的处理程序，do_signal()就函数必须强迫该处理程序执行。这是调用handle_signal()函数进行的。	
+			static void handle_signal(unsigned long sig, siginfo_t *info, struct k_sigaction *ka, sigset_t *oldset,	struct pt_regs * regs)
+		建立帧：为了适当地建立进程的用户态堆栈，handle_signal()函数或者调用setup_frame()，或者调用setup_rt_frame()。
+			static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
+				   sigset_t *set, struct pt_regs * regs)	
+		检查信号标志
+			建立了用户态堆栈之后，handle_signal()函数检查与信号相关的标准值。如果信号没有设置SA_NODEFER标志，在sigaction表中sa_mask字段对应的信号就必须在信号处理程序执行期间被阻塞。
+		开始执行信号处理程序
+			do_signal()返回时，当前进程恢复它在用户态的执行。
+		终止信号处理程序
+			信号处理程序执行结束时，放回栈顶地址，该地址指向帧的pretcode字段所引用的vsyscall页中的代码。
+				__kernel_sigreturn:
+				.LSTART_sigreturn:
+					popl %eax		/* XXX does this mean it needs unwind info? */
+					movl $__NR_sigreturn, %eax
+					int $0x80
+			因此，信号编号（即帧的sig字段）被从栈中丢弃，然后调用sigreturn()系统调用。
+			
+	系统调用的重新执行
+		内核并不总是能立刻满足系统调用发出的请求，在这种情况发生时，把系统调用的进程置为TASK_INTERRUPTIBLE或TASK_UNINTERRUPTIBLE状态。
+		如果进程处于TASK_INTERRUPTIBLE状态，并且某个进程向它发送了一个信号，那么，内核不完成系统调用就把进程置成TASK_RUNNING状态。当切换回用户态时信号被传递给进程。当这种情况发生时，系统调用服务例程没有完成它的工作，但返回EINTR或其他错误码。
+		实际上，这种情况用户态进程获得的唯一错误码是EINTR，这个错误码表示系统调用还没执行完。
+	重新执行被未捕获信号中断的系统调用
+		如果信号被显示地忽略，或者如果它的缺省操作已被强制执行，do_signal()就分析系统调用的出错码，并决定是否重新自动执行未完成的系统调用。
+	为所捕获的信号重新执行系统调用
+		如果信号被捕获，那么handle_signal()分析错误码，也可能分析sigaction表的SA_RESTART标志来决定是否必须重新执行未完成的系统调用。
+
+与信号处理相关的系统调用
+	正如本章已提到的，在用户态运行的进程可以发送和接受信号。这意味着必须定义一组系统调用来完成这些操作。遗憾的是，由于历史的原因，已经存在几个具有相同功能的系统调用，因此，其中一些系统调用从未被调用。
+	kill()系统调用
+		一般用kill(pdi,sig)系统调用向普通进程或多线程应用发送信号，其相应的服务例程是sys_kill()函数。
+	tkill()和tgkill()系统调用
+		tkill()和tgkill()系统调用向线程组中的指定进程发送信号。
+
+	改变信号操作
+		sigaction(sig,act,oact)系统调用允许用户为信号指定一个操作。当然，如果没有自定义的信号操作，那么内核执行与传递的信号相关的缺省操作。
+		
+	检查挂起的阻塞信号
+		sigpending系统调用允许进程检查挂起的阻塞信号的集合，也就是说检查信号被阻塞时已产生的那些信号。
+		
+	修改阻塞信号的集合
+		sigprocmask()系统调用允许进程修改阻塞信号的集合。这个系统调用只应用于常规信号（非实时信号）。
+		
+	挂起进程
+		sigsuspend()系统调用把进程置为TASK_INTERRUPTIBLE状态，当然这是把mask参数指向的位掩码数组所指定的标准信号阻塞以后设置的。只有当一个非忽略、非阻塞的信号发送到进程以后，进程才被唤醒。
+
+	实时信号的系统调用
+		实时信号的几个系统调用(rt_sigaction(),rt_sigpending(),rt_sigprocmask(),rt_sigsuspend())与前面描述的类似，因此不再进一步讨论。

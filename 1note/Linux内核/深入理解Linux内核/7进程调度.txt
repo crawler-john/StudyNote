@@ -1,0 +1,212 @@
+进程调度
+	Linux和任何分时系统一样，通过一个进程到另一个进程的快速切换，达到表面上看来多进程同时执行的神奇效果。
+	
+调度策略
+	传统Unix操作系统的调度算法必须实现几个互相冲突的目标：进程响应时间尽可能快，后台作业的吞吐量尽可能高，尽可能避免进程的饥饿特性，低优先级和高优先级进程的需要尽可能调和等等。
+	决定什么时候以怎样的方式选择一个新进程运行的这组规则就是所谓的调度策略（scheduling policy）。
+	Linux的调度基于分时（time sharing）技术：多个进程以“时间多路复用”方式运行，因为CPU的时间被分成“片（slice）”，给每个可运行进程分配一片。当然单处理器在任何给定的时刻只能运行一个进程。如果当前运行进程的时间片或时限（quantum）到期时，该进程还没有运行完毕，进程切换就可以发生。
+	调度策略也是根据进程的优先级对它们进行分类。
+	在Linux中，进程的优先级是动态地。调度程序跟踪进程正在做什么，并周期性地调整它们的优先级。在这种方式下，在较长的时间间隔内没有使用CPU进程，通过动态的增加它们的优先级来提升它们。相应的，对于已经在CPU上运行了较长时间的进程，通过减少它们的优先级来处罚它们。
+	当谈及有关调度问题是，传统上分为“I/O受限”或“CPU受限”。
+	另一种分类法，把进程区分为三类：
+		交互式进程：这些进程经常和用户进行交互，因此，要花很多时间等待键盘和鼠标操作。
+		批处理进程：这些进程不必与用户交互，因此经常在后台运行。
+		实时进程：这些进程有很强的调度需要。
+
+进程的抢占
+	Linux进程是抢占式的。如果进程进入TASK_RUNNING状态，内核检查它的动态优先级是否大于当前正运行进程的优先级。如果是，current的执行被中断，并调用调度程序选择另一个进程运行。当然，进程在它的时间片到期也可以被抢占。
+	
+一个时间片必须持续多长？
+	时间片的长短对系统性能很关键：它既不能太长也不能太短。
+	如果时间片太短，由进程切换引起的系统额外开销就变得非常高。
+	如果时间片太长，进程看起来就不再是并发执行。
+	
+调度算法
+	早期Linux版本中的调度算法非常简单易懂：在每次进程切换时，内核扫描可运行进程的链表，计算进程的优先级，然后选择“最佳”进程来进行。这个算法的主要缺点是选择“最佳”进程所要消耗的时间与可运行的进程数量相关，因此这个算法的开销太大，在运行数千个进程的高端系统中要消耗太多的时间。
+	Linux2.6调度算法就复杂多了。通过设计，该算法较好地解决了与可运行进程数量比例关系，因为它在固定的时间内（与可运行的进程数量无关）选中要运行的进程。
+	调度程序总能成功找到要执行的进程。事实上，总是至少有一个可运行进程，即swapper进程，它的PID等于0，而且它只有在CPU不能执行其他进程时才执行。
+	每个Linux进程总是按照下面的调度类型被调度：
+		SCHED_FIFO:先进先出实时进程。
+		SCHED_PR:时间片轮转的实用进程。
+		SCHED_NORMAL:普通的分时进程。
+	调度算法根据进程是普通进程还是实时进程而有很大不同。
+
+普通进程调度
+	每个普通进程都要它自己的静态优先级，调度程序使用静态优先级来评估系统中这个进程与其他进程之间调度的程序。内核用从100(最高优先级)到139（最低优先级）的数表示普通进程的静态优先级。注意，值越大，静态优先级越低。
+	新进程总是继承其父进程的静态优先级。不过通过把某些“nice值”传递给系统调用nice()和setpriority()，用户可以改变自己拥有的进程的优先级。
+	基本时间片：
+		静态优先级本质上解决了进程的基本时间片，即进程用完了以前的时间片时，系统分配给进程的时间片长度。（简而言之，优先级越高，时间片越长，优先级越低，时间片越短）。
+	动态优先级和平均睡眠时间
+		普通进程除了静态优先级，还有动态优先级，其值的范围是100（最高优先级）~139（最低优先级）。动态优先级是调度程序在选择新进程来运行的时候使用的数。它与静态优先级的关系用下面的经验公式表示。
+			动态优先级 = max(100,min(静态优先级-bonus+5,139))
+			bonus的范围是0~10，值小于5表示降低动态优先级以示惩罚，值大于5表示增加动态优先级以示悬赏。bonus的值依赖进程过去的情况，说的更准确点些，是与进程的平均睡眠时间有关。
+			平均睡眠时间是进程在睡眠状态所消耗的平均纳秒数。
+		平均睡眠时间也被调度程序用来确定一个给定进程是交互进程还是批处理进程。更明确地说，如果一个进程满足下面的公式，就被看作是交互式进程：
+			动态优先级 <= 3*静态优先级/4+28 相当于 bonus-5 >=静态优先级/4-28
+	活动和过期进程
+		即使具有较高静态优先级的普通进程获得了较大的CPU时间片，也不该使静态优先级较低的进程无法运行。为了避免进程饥饿，当一个进程用完它的时间片时，它应该被还没有用完时间片的低优先级进程取代。为了实现这种机制，调度程序维持两个不想交的可运行进程的集合活动。
+		活动进程：这些进程还没有用完它们的时间片，因此允许它们运行。
+		过期进程：这些可运行进程已经用完它们的时间片，并因此被禁止运行，直到所有活动进程都过期。
+		
+实时进程调度
+	每个实时进程都与一个实时优先级相关，实时优先级是一个范围从1（最高优先级）~99（最低优先级）的值。调度程序总是让优先级高的进程运行，换句话说，实时进程运行的过程中，禁止低优先级进程的执行。与普通进程相反，实时进程总是被当成活动进程。
+		用户可以通过系统调用sched_setparam()和sched_setscheduler()改变进程的实时优先级。
+	只有下述事件发生的时候，实时进程才会被另一个进程取代：
+		1、进程被另一个具有更高实时优先级的实时进程抢占。
+		2、进程执行阻塞操作并进入睡眠（处于TASK_INTERRUPTIBLE或TASK_UNINTERRUPTIBLE状态）。
+		3、进程停止（处于TASK_STOPPED或TASK_TRACED状态）或者被杀死（处于TASK_ZOMBIE或EXIT_DEAD状态）
+		4、进程通过调用系统调用sched_yield()资源放弃CPU。
+		5、进程是基于时间片轮转的实时进程（SCHED_PR），而且用完了它的时间片。
+	当系统调用nice()和setpriority()用于基于时间片轮转的实时进程时，不改变实时进程的优先级而会改变其基本时间片的长度。
+	
+调度程序所使用的数据结构
+	进程链表链接所有的进程描述符，而运行队列链表链接所有的可运行进程（也就是出于TASK_RUNNING状态的进程）的进程描述符，swapper进程（idle进程）除外。
+	数据结构runqueue
+		数据结构runqueue是Linux2.6调度程序中最重要的数据结构。系统中每个CPU都有它自己的运行队列，所有的runqueue结构存放在runqueues每CPU变量中。宏cpu_rq()产生本地CPU运行队列的地址，而宏cpu_rq(n)产生索引为你的CPU的运行队列地址。
+			struct runqueue {
+				spinlock_t lock;		//保护进程链表的自旋锁
+
+				/*
+				 * nr_running and cpu_load should be in the same cacheline because
+				 * remote CPUs use both these fields when doing load calculation.
+				 */
+				unsigned long nr_running;	//运行队列链表中可运行进程的数量
+			#ifdef CONFIG_SMP
+				unsigned long cpu_load;		//基于运行队列中进程的平均数量的CPU复杂因子
+			#endif
+				unsigned long long nr_switches;	//CPU执行进程切换的次数
+
+				/*
+				 * This is part of a global counter where only the total sum
+				 * over all CPUs matters. A task can increase this counter on
+				 * one CPU and if it got migrated afterwards it may decrease
+				 * it on another CPU. Always updated under the runqueue lock:
+				 */
+				unsigned long nr_uninterruptible;	//先前在允许队列链表中而现在睡眠在TASK_UNINTERRUPTIBLE状态的进程数量
+
+				unsigned long expired_timestamp;	//过期队列中最老的进程被插入队列的时间
+				unsigned long long timestamp_last_tick;	//最近一次定时器中断的时间戳值
+				task_t *curr, *idle;				//当前cpu上swapper进程的进程描述符指针
+				struct mm_struct *prev_mm;			//在进程切换期间用来存放被替换进程的内存描述符地址
+				prio_array_t *active, 			//指向活动进程链表的指针
+							*expired, 			//指向过期进程链表的指针
+							arrays[2];			//活动进程和过期进程的两个集合
+				int best_expired_prio;		//过期进程中静态优先级最高的进程
+				atomic_t nr_iowait;			//先前在允许队列的链表中而现在正在等待磁盘I/O操作结束的进程的数量
+
+			#ifdef CONFIG_SMP
+				struct sched_domain *sd;	//指向当前CPU的基本调度域
+
+				/* For active balancing */
+				int active_balance;		//如果要把一些进程从本地允许队列迁移到另外的运行队列，就设置这个标志
+				int push_cpu;			//未使用
+
+				task_t *migration_thread;		//迁移内核进程的进程描述符指针
+				struct list_head migration_queue;	//从运行队列中被删除的进程的链表
+			#endif
+			};
+	进程描述符
+		每个进程描述符都包含几个与调度相关的字段。
+		当新进程被创建的时候，由copy_process()调用的函数sched_fork()用下述方法设置current进程（父进程）和P进程（子进程）的time_slice字段：
+			p->time_slice = (current->time_slice + 1) >> 1;
+			current->time_slice >>= 1;
+			换句话说，父进程剩余的节拍数被划分成两等份：一份给父进程，另一份给子进程。这样做是为了避免用户通过下述方法获得无限的CPU时间：
+				父进程创建一个可运行相同代码的子进程，并随后杀死自己，通过适当地调节创建的速度，子进程就可以总是在父进程过期之前获得新的时间片。
+		函数copy_process()也初始化子进程描述符中与进程调度相关的几个字段：
+			p->first_time_slice = 1;
+			p->timestamp = sched_clock();
+			因为子进程没有用完它的时间片，所以first_time_slice标志被置为1.用函数sched_clock()初始化p->timestamp字段：实际上，函数sched_clock()返回被转换成纳秒的64位寄存器TSC。
+			
+调度程序所使用的函数
+	调度程序依靠几个函数来完成调度工作其中最重要的函数是：
+		scheduler_tick()	：维持当前最新的time_slice计时器。
+		try_to_wake_up()	：唤醒睡眠进程
+		recalc_task_prio()	：更新进程动态优先级
+		schedule()			：选择要被执行的新进程
+		load_balance()		：维持多处理器系统中运行队列的平衡
+	scheduler_tick()：
+		更新实时进程的时间片。
+			如果当前进程是先进先出（FIFO）的实时进程，函数scheduler_tick()什么都不做。
+			如果current表示基于时间片轮转的实时进程，scheduler_tick()就递减它的时间片计数器并检查时间片是否被用完。
+			如果函数确定时间片确实用完了，就执行一些列操作以达到抢占当前进程的目的，如果必要的话，就尽快抢占。
+		更新普通进程时间片
+			如果当前进程是普通进程，函数scheduler_tick()执行下列操作：
+				1、递减时间片计数器（current->time_slice）
+				2、检查时间片计数器。如果时间片用完了，执行下列操作：
+							dequeue_task(p, rq->active);		//从可运行进程rq->active集合中删除current指向的进程
+							set_tsk_need_resched(p);			//设置TIF_NEE_RESCHED标志
+							p->prio = effective_prio(p);		//更新current指向的进程的动态优先级
+							p->time_slice = task_timeslice(p);	//重填进程的时间片
+							p->first_time_slice = 0;
+
+							if (!rq->expired_timestamp)			//若果本地允许队列数据结构的expired_timestamp字段等于0（即过期进程集合为空），就把当前的时钟节拍的值赋给expired_timestamp
+								rq->expired_timestamp = jiffies;
+							if (!TASK_INTERACTIVE(p) || EXPIRED_STARVING(rq)) {	//把当前进程插入活动进程集合或过期进程集合
+								enqueue_task(p, rq->expired);
+								if (p->static_prio < rq->best_expired_prio)
+									rq->best_expired_prio = p->static_prio
+				3、否则，如果时间片没用完（current->time_slice不等于0），检查当前进程的剩余时间片是否太长。
+	try_to_wake_up()：
+		try_to_wake_up()函数通过把进程状态设置为TASK_RUNNING，并把该进程插入本地CPU的运行队列来唤醒睡眠或停止的进程。
+	recalc_task_prio()：
+		recalc_task_prio()函数更新进程的平均睡眠时间和动态优先级。它接受进程描述符的指针P和由函数sched_clock()计算出的当前时间戳now作为参数。
+	schedule()：
+		函数schedule()实现调度程序。它的任务是从运行队列的链表中找到一个进程，并随后将CPU分配给这个进程。schedule()可以由几个内核控制路径调用，可以使用直接调用或者延迟（lazy）调用（可延迟的）的方式。
+		直接调用：如果current进程因不能获得必需的资源而要立刻被阻塞，就直接调用调度程序。
+		延迟调用：也可以把current进程的TIF_NEED_RESCHED标志设置为1，而已延迟方式调用调度程序。由于总是以恢复用户态进程执行之前检查这个标志的值，所以schedule()将在不久之后的某个时间被明确地调用。
+		进程切换前schedule()所执行的操作：schedule()函数的任务之一是用另一个进程来替换当前正在执行的进程。
+		schedule()完成进程切换时所执行的操作：现在schedule()函数已经要让next进程投入运行。内核将立刻访问next进程的thread_info数据结构，其地址存放在next进程描述符的接近顶部的位置。
+		进程切换后schedule()所执行的操作：schedule()函数中的switch_to宏调用之后紧接着的指令并不由next进程立刻执行，而且稍后当调度程序又选择prev执行时由prev执行。然而在那个时刻，prev局部变量并不指向我们开始描述schedule()所替换出去的原来那个进程，而是指向prev被调度时prev替换出的原来的那个进程。
+		
+多处理器系统中运行队列的平衡
+	3种不同类型的多处理器机器：
+		1、标准的多处理器体系结构：
+			直到最近，这是多处理器机器最普通的体系结构。这些机器所共有的RAM芯片集被所有CPU共享。
+		2、超线程
+			超线程芯片是一个立刻执行几个执行线程的微处理器；它包含几个内部寄存器的拷贝，并快速在它们之间切换。这是由Intel发明的技术，使得当前线程在访问内存的间隙，处理器可以使用它的机器周期去执行另一个线程。一个超线程的物理CPU可以被Linux看作几个不同的逻辑CPU。
+		3、NUMA
+			把CPU和RAM以本地“节点”为单位（通常一个节点包括一个CPU和几个RAM芯片）。内存仲裁器（一个使系统中的CPU以串行方式访问RAM的专门电路）是典型的多处理器系统的瓶颈。在NUMA体系结构中CPU访问与它同在一个节点中“本地”RAM芯片时，几乎没有竞争，因此访问通常非常快的。另一方面访问其所属节点外的“远程”RAM芯片就非常慢。
+	调度域
+		调度域（schedule domain）实际上是一个CPU集合，它们的工作量应当由内核保持平衡。一般来说，调度域采取分层的组织形式：
+			最上层的调度域（通常包括系统中的所有CPU）包括多个子调度域，每个子调度与包含一个CPU子集。正是调度域的这种分层结构，使工作量的平衡能以如下有效方式实现。
+		每个调度域被依次划分成一个或多个组，每个组代表调度域的一个CPU子集。工作量的平衡总是在调度域的组之间来完成的。换而言之，只有在某调度域的某个组的总工作量远远低于同一个调度域的另一个组的工作量时，才把进程从一个CPU迁移到另一个CPU。
+	rebalance_tick()函数：
+		为了保持系统中运行队列的平衡，每次经过一个时钟节拍，scheduler_tick()就调用rebalance_tick()函数。
+		static void rebalance_tick(int this_cpu, runqueue_t *this_rq, enum idle_type idle)
+			idle标志取值：
+				SCHED_IDLE:CPU当前空闲，即current是swapper进程。
+				NOT_IDLE：CPU当前不是空闲，即current不是swapper进程。
+		rebalance_tick()函数首先确定运行队列中的进程数，并更新运行队列的平均工作量，为了完成这个工作，函数要访问运行队列描述符的nr_running和cpu_load字段。
+		随后，rebalance_tick()开始在所有调度域上的循环，其路径是从基本域（本地允许队列描述符的sd字段所应用的域）到最上层的域。在每次循环中，函数确定是否已到调用函数load_balance()的事件，从而在调度域执行重新平衡的操作。
+	load_balance()函数：
+		load_balance()函数检查是否调度域处于严重的不平衡状态。更确切的说，它检查是否可以通过把最繁忙的组中的一些进程迁移到本地CPU的运行队列来减轻不平衡的状态。
+		static int load_balance(int this_cpu, runqueue_t *this_rq, struct sched_domain *sd, enum idle_type idle)
+	move_tasks()函数：
+		move_tasks()函数把进程从源运行队列迁移到本地允许队列。
+			static int move_tasks(runqueue_t *this_rq, int this_cpu, runqueue_t *busiest, unsigned long max_nr_move, struct sched_domain *sd, enum idle_type idle)
+	
+与调度相关的系统调用
+	作为一般原则，总是允许用户降低其进程的优先级。然而，如果他们想修改属于其他某一用户进程的优先级，或者如果他们想增加自己进程的优先级，那么他们必须拥有超级用户的特权。
+	nice()系统调用
+		nice()系统调用允许进程改变它们的基本优先级。
+		nice()系统调用只维持向后兼容，它已经被下面描述的setpriority()系统调用所取代。
+	getpriority()和setpriority()系统调用
+		nice()系统调用只影响调用它的进程，而另外两个系统调用getpriority()和setpriority()则作用于给定组中所有进程的基本优先级。
+		getpriority()返回20减去给定组中所有进程之中最低nice字段值（即所有进程中最高优先级）。
+		setpriority()把给定组中所有进程的基本优先级都设置为一个给定的值。
+	sched_getaffinity()和sched_setaffinity()系统调用
+		sched_getaffinity()和sched_setaffinity()系统调用分别返回和设置CPU进程亲和力掩码，也就是运行执行进程的CPU的位掩码。该掩码存放在进程描述符的cpus_allowed字段中。
+	与实时进程相关的系统调用
+		sched_getscheduler()和sched_setscheduler()系统调用
+			sched_getscheduler()查询由pid参数所表示的进程当前所用的调度策略。如果pid等于0，将检索调用进程的策略。如果成功，这个系统调用为进程返回策略：
+				SCHED_FIFO,SCHED_PR或SCHED_NORMAL。
+			sched_setscheduler()系统调用即设置调度策略，也设置由参数pid所表示进程的相关参数。如果pid为0，调用进程的调度程序参数将被设置。
+		sched_getparam()和sched_setparam()系统调用
+			sched_getparam()系统调用为pid所表示的进程检索调度参数。如果pid为0，则current进程的参数被检索。
+			sched_setparam()系统调用类似于sched_setscheduler()，它与后者的不同在于不让调用者设置policy字段的值。
+		sched_yield()系统调用
+			sched_yield()系统调用运行进程在不被挂起的情况下自愿放弃CPU，进程仍然处于TASK_RUNNING状态，但调度程序将它放在运行队列的过期进程集合中，或放在运行队列链表的末尾。
+		sched_get_priority_min()和sched_get_priority_max()系统调用
+			sched_get_priority_min()和sched_get_priority_max()系统调用分别返回最小和最大实时静态优先级的值，这个值由policy参数所标识的调度策略来使用。
+		sched_rr_get_interval()系统调用
+			sched_rr_get_interval()系统调用把参数pid表示的实时进程的轮转时间片写入用户态地址空间的一个结构中。如果pid为0，系统调用就写当前进程的时间片。

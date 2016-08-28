@@ -1,0 +1,215 @@
+定时测量
+	很多计算机化的活动都是由定时测量（timing measurement）来驱动的，这常常对用户是不可见的。例如，当你停止使用计算机的控制台以后，屏幕会自动关闭，这的归因于定时器，它允许内核跟踪你按键或移动鼠标后到现在过了多少时间。
+	Linux内核必需完成两种主要的定时测量，我们可以对此加以区别：
+		保存当前时间和日期，以便能通过time(),ftime(),gettimeofday()系统调用把它们返回给用户程序，也可以由内核本身把当前时间作为文件和网络包的时间戳。
+		维持定时器，这个机制能够告诉内核或用户程序某一时间间隔已经过去了。
+	定时器是由基本固定频率振荡器和计数器的几个硬件电路完成的。
+	
+时钟和定时器电路
+	在80x86体系结构上，内核必须显式地与集中时钟和定时器电路打交道。时钟电路同事用于跟踪当前时间和产生精确的事件量度。
+	
+实时时钟（RTC）
+	所有PC都包含一个叫实时时钟（real Time Clock RTC）的时钟，它独立于CPU和所有其他芯片的。
+	即使当PC被切断电源，RTC还继续工作，因为它靠一个小电池或蓄电池供电。
+	RTC能在IRQ8上周期性的发出中断，频率在2~8192Hz之间。也可以对RTC进行编程以使当RTC到达某个特定的值是激活IRQ8线，也就是作为一个闹钟来工作。
+	Linux只用RTC来获取事件和日期，不过，通过对/dev/rtc设备文件进行操作，也允许进程对RTC编程。
+
+时间戳计数器（TSC）
+	所有的80x86微处理器都包含一条CLK输入引线，它接受外部振荡器的时钟信号。
+	算出CPU实际频率的任务是在系统初始化期间完成的。
+	
+可编程间隔定时器（PIT）
+	PIT的作用类似于微波炉的闹钟，即让用户意识到烹调的时间间隔已经过去了。所不同的是，这个设备不是通过振铃，而是发出一个特殊的中断，叫做时钟中断来通知内核又一个时间间隔过去了。
+	
+CPU本地定时器
+	CPU本地定时器是一种能够产生单步中断或周期性中断的设备，它类似于之前的可编程间隔定时器，不过存在几点区别：
+		APIC计数器是32位的，而PIC计数器是16位的；
+		本地APIC定时器把中断只发送给自己的定时器，而PIT产生一个全局性中断，系统中的任一CPU都可以对其处理。
+		APIC定时器是基于总线时钟信号的。相反，PIT有其自己的内部时钟振荡器，可以更灵活的编程。
+		
+ACPI电源管理定时器
+	ACPI电源管理定时器是另一种时钟设备，包含在几乎所有基于ACPI的主板。它的时钟信号大约为3.58MHz的固定频率。该设备实际上是一个简单的定时器，它在每个时钟节拍到来时增加一次。为了读取计数器的当前值，内核需要访问某个I/O端口，该端口的地址由BIOS在初始化阶段确认。
+	
+Linux计时体系结构
+	Linux必定执行与定时相关的操作。例如内核周期性地：
+		更新自系统启动以来所经历的时间。
+		更新时间和日期。
+		确定当前进程在每个CPU上已运行了多长时间，如果超过了分配给它的时间，则抢占它。
+		更新资源使用统计数。
+		检测每个软定时器的事件间隔是否已到。
+		
+计时体系结构的数据结构
+	定时器对象
+		为了使用一种统一的防范来处理可能存在的定时器资源，内核使用了“定时器对象”，它是timer_opts类型的一个描述符，该类型由定时器的名称和其他四个标准的方法组成：
+			struct timer_opts {
+				char* name;									标识定时器源的一个字符串
+				void (*mark_offset)(void);					记录上一个节拍的准确时间，由时钟中断处理程序调用
+				unsigned long (*get_offset)(void);			返回自上一个节拍开始所经历的时间
+				unsigned long long (*monotonic_clock)(void);返回自内核初始化开始所经历的时间
+				void (*delay)(unsigned long);				等待指定数目的“循环”
+			};
+	jiffies变量
+		jiffies变量是一个计数器，用来记录自系统启动以来产生的节拍数。
+		每次时钟中断发生时它便加1。
+	xtime变量
+		xtime变量存放当前时间和日期，它是一个timespec类型的数据结构
+			tv_sec：存放自1970年1月1日（UTC）午夜以来经过的秒数
+			tv_nsec：存放自上一秒开始经过的纳秒数
+		xtime变量基本是每个节拍更新一次，也就是说，大约每秒更新1000次。
+		
+单处理器系统上的计时体系结构
+	在当处理器系统上，所有的定时有关的活动都是由IRQ线0上的可编程间隔定时器产生的中断触发的。
+	初始化阶段：
+		在内核初始化期间time_init()函数被调用来建立计时体系结构，它通常执行如下操作：
+			void __init time_init(void)
+			{
+			#ifdef CONFIG_HPET_TIMER
+				if (is_hpet_capable()) {
+					/*
+					 * HPET initialization needs to do memory-mapped io. So, let
+					 * us do a late initialization after mem_init().
+					 */
+					late_time_init = hpet_time_init;
+					return;
+				}
+			#endif
+				xtime.tv_sec = get_cmos_time();
+				xtime.tv_nsec = (INITIAL_JIFFIES % HZ) * (NSEC_PER_SEC / HZ);
+				set_normalized_timespec(&wall_to_monotonic,
+					-xtime.tv_sec, -xtime.tv_nsec);
+
+				cur_timer = select_timer();
+				printk(KERN_INFO "Using %s for high-res timesource\n",cur_timer->name);
+
+				time_init_hook();
+			}
+			1.初始化xtime变量。利用get_cmos_time()函数从实时时钟中读取自1970年1月1日（UTC）午夜以来经历的秒数。
+			2.初始化wall_to_monotonic变量。这个变量和xtime一样是timespec类型，只不过它存放将被加到xtime上的秒数和纳秒数，以此来获得单向的时间流。
+			3.如果内核支持HPET，它将调用hpet_enable()函数确认ACPI固件是否探测到该芯片并将它的寄存器映射到了内存地址空间中。
+			4.调用select_timer()来挑选系统中可利用的最好的定时器资源，并设置cur_timer变量指向该定时器资源对应的定时器对象的地址。
+			5.调用set_irq(0,&irq0)来创建与IRQ0相应的中断门，IRQ0引脚连接着系统时钟中断源（PIT或HPET）
+	时钟中断处理程序
+		timer_interrupt()函数是PIT或HPET的中断服务例程（ISR），它执行以下步骤：
+			irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+			{
+				/*
+				 * Here we are in the timer irq handler. We just have irqs locally
+				 * disabled but we don't know if the timer_bh is running on the other
+				 * CPU. We need to avoid to SMP race with it. NOTE: we don' t need
+				 * the irq version of write_lock because as just said we have irq
+				 * locally disabled. -arca
+				 */
+				write_seqlock(&xtime_lock);
+
+				cur_timer->mark_offset();
+			 
+				do_timer_interrupt(irq, NULL, regs);
+
+				write_sequnlock(&xtime_lock);
+				return IRQ_HANDLED;
+			}
+			1.在xtime_lock顺序锁上产生一个write_seqlock()来保护预订时期相关的内核变量
+			2.执行cur_timer->mark_offset();
+			3.调用do_timer_interrupt(irq, NULL, regs);
+			4.调用write_sequnlock(&xtime_lock)释放xtime_lock顺序锁。
+			5.返回值1，报告中断已经被有效地处理了。
+			
+多处理器系统上的定时体系结构
+	多处理器系统可以依赖两种不同的时钟中断源：可编程间隔定时器或高精度事件定时器产生的中断，以及CPU本地定时器产生的中断。
+	初始化阶段
+		全局时钟中断处理程序由time_init()函数初始化。
+	全局时钟中断处理程序
+		SMP版本的timer_interrupt()处理程序和UP版本的该处理程序存在差异：
+			timer_interrupt()调用函数do_timer_interrupt(irq, NULL, regs)向I/O APIC芯片的一个端口写入，以应答定时器的中断请求。
+			update_process_time()函数不被调用，因为该函数执行与特定CPU相关的操作
+			profile_tick()不被调用，因为该函数同样执行与特定CPU相关的函数
+	本地时钟中断程序
+		该处理程序执行系统中与特定CPU相关的计时活动，即监管内核代码并检测当前进程在特定CPU上运行了多长时间。
+		
+更新时间和日期
+	用户程序从xtime变量中获取当前时间和日期。内核必须周期性地更新该变量，才能使它的值保持相当的精确。
+	全局时钟中断处理程序调用update_times()函数更新xtime变量的值，代码如下：
+		static inline void update_times(void)
+		{
+			unsigned long ticks;
+
+			ticks = jiffies - wall_jiffies;	//wall_jiffies存放xtime最后更新时间
+			if (ticks) {
+				wall_jiffies += ticks;
+				update_wall_time(ticks);
+			}
+			calc_load(ticks);		//记录系统负载
+		}
+		
+更新系统统计数
+	内核在与定时相关的其他任务中必须周期性地收集若干数据用于：
+		检查允许进程的CPU资源限制
+		更新与本地CPU工作负载有关的统计数
+		计算平均系统负载
+		监管内核代码
+	更新本地CPU统计数
+		调用update_process_times()函数来更新一些内核统计数。
+			void update_process_times(int user_tick)
+			{
+				struct task_struct *p = current;
+				int cpu = smp_processor_id();
+
+				/* Note: this timer irq context must be accounted for as well. */
+				if (user_tick)
+					account_user_time(p, jiffies_to_cputime(1));
+				else
+					account_system_time(p, HARDIRQ_OFFSET, jiffies_to_cputime(1));
+				run_local_timers();
+				if (rcu_pending(cpu))
+					rcu_check_callbacks(cpu, user_tick);
+				scheduler_tick();
+			}
+	记录系统负载
+		任何Unix内核都要记录系统进行了多少CPU活动。这些统计数据由各种管理使用程序来使用。
+	监管内核代码
+		Linux包含一个被称作readprofiler的最低要求的代码监管器，Linux开发者用其发现内核在内核态的什么地方花费时间。监管器确认内核的“热点”--执行最频繁的内核代码片段。确定内核“热点”是非常重要的，因为这可以指出应当进一步优化的内核函数。
+	
+检查非屏蔽中断（NMI）监视器
+	在多处理器系统上，Linux为内核开发者还提供了另一种功能：看门狗系统（watchdog system），这对于探测引起系统冻结的内核bug可能相当有用。
+	为了激活这样的看门狗，必须在内核启动时传递nmi_watchdog参数。
+	看门狗基于本地和I/O APIC一个巧妙的硬件特性：它们能在每个CPU上产生周期性的NMI中断，因为NMI中断不能由汇编指令屏蔽，所以即使禁止中断，看门狗也能检测到死锁。
+	
+软定时器和延迟函数
+	定时器是一种软件功能，即允许在将来的某个时刻，函数在给定的时间间隔用完时被调用。超时表示与定时器相关的时间间隔已经用完的那个时刻。
+	内核和进程广泛使用定时器。大多数设备驱动程序利用定时器检测反常情况。
+	动态定时器
+		动态定时器（dynamic timer）被动态地创建和撤销，对当前活动动态定时器的个数没有限制。
+		为了创建并激活一个动态定时器，内核必须：
+			1.如果需要，创建一个新的timer对象，这可以通过下列方式来进行：
+				在代码定义一个静态全局变量
+				在函数定义一个局部变量：在这种情况下，这个对象存放在内核堆栈中。
+				在动态分配的描述符中包含这个对象。
+			2.调用init_timer(&t)函数初始化对象。
+			3.把定时器到期时激活函数的地址存入function字段。如果有需要把参数传递到data字段
+			4.如果动态定时器还没有被插入到链表中，给expires字段附一个合适的值并调用add_timer(&t)函数把t元素插入到合适的链表中
+			5.否则如果动态定时器已经被插入到链表，则调用mod_timer()函数来更新expires字段。
+	动态定时器与竞争条件
+		被异步激活的动态定时器由参与竞争条件的倾向。在释放资源前停止定时器
+			...
+			del_timer(&t);
+			X_Release_Resources();
+			...
+	动态定时器数据结构
+		struct tvec_t_base_s {
+			spinlock_t lock;
+			unsigned long timer_jiffies;
+			struct timer_list *running_timer;
+			tvec_root_t tv1;
+			tvec_t tv2;
+			tvec_t tv3;
+			tvec_t tv4;
+			tvec_t tv5;
+		} ____cacheline_aligned_in_smp;
+	动态定时器的处理
+		尽管软定时器具有巧妙的数据结构，但是对其处理是一种耗时的活动，所以不应该被时钟中断处理程序执行。在Linux2.6中该活动由可延迟函数来执行，也就是有TIMER_SOFTIRQ软中断执行。
+		run_timer_softirq()函数是与TIMER_SOFTIRQ软中断请求相关的可延迟函数。
+	
+延迟函数
+	当内核需要等待一个较短的时间间隔--比方说，不超过几毫秒，就无需使用软定时器。例如，通常设备驱动器会等待预先定义的数个微秒直到硬件完成某些操作。
+	
+		
