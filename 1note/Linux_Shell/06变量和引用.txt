@@ -1,0 +1,56 @@
+第6章 变量和引用
+	变量是任何一门编程语言和脚本语言的核心，而shell脚本使用变量就需要引用，因此，引用和变量密切相关。
+	
+6.1 变量的替换和赋值
+	变量是某个值得名称，引用变量值就成为变量替换，$符号是变量替换符号，如variable是变量名，那么，$variable就表示变量的值。将值赋给某个变量名就称为变量赋值，变量赋值有两种格式，如下所示：
+		variable=value
+		${ variable=value }
+	对应变量赋值有一下三点说明：
+		1.等号的两边可以有空格，这不影响赋值操作。
+		2.如果值（value）中包含空格，则必须用双引号括起来；
+		3.变量名只能包含大小写字母（a-zA-Z）、数字（0-9）、下划线（_）等符号，并且变量名不能以数字开头，否则视为无效变量名。
+	利用unset命令可以清楚变量的值，命令格式为：
+		unset 变量名
+	变量赋值模式：
+		variable=value						将value值赋给变量variable
+		variable+value						对已赋值的variable，重设其值
+		variable?value或variable:?value		对未赋值的variable，显示系统错误信息
+		variable:=value						对未赋值的variable，将value值赋给它	
+		variable:-value						对未赋值的variable，将value值赋给它，但是value值不存储到variable对应的地址空间
+	
+	环境变量：
+		1.定义和清除环境变量
+			定义环境变量的格式：
+				ENVIRON-VARIABLE=value			#环境变量赋值
+				export ENVIRON-VARIABLE			#声明环境变量
+		2.重要的环境变量
+			1.PWD和OLDPWD
+				PWD记录当前目录路径，当利用cd命令改变当前目录时，系统自动更新PWD的值。
+				OLDPWD记录就得工作目录，即用户所处的前一个目录。
+			2.PATH
+				PATH是Linux中一个极为重要的环境变量，它用于帮助Shell找到用户所输入的命令。
+			3.HOME
+				HOME记录当前用户的根目录，由/etc/passwd的倒数第二个域决定，HOME目录用于保存用户自己的文件。
+			4.SHELL
+				SHELL变量保存默认的Shell值，默认的值为/bin/bash，表示当前的Shell是bash Shell。
+			5.USER和UID
+				USER和UID是保存用户信息的环境变量，USER表示已登录用户的名字，UID则表示已登录用户的ID。
+			6.PPID
+				PPID是创建当前进程的进程号，即当前进程的父进程号。
+			7.PS1和PS2
+				PS1和PS2称为提示符变量，用于设置提示符格式。
+			8.IFS
+				IFS用于指定Shell域分隔符，默认值为空。
+		3.几个环境变量配置文件
+			.bash_profile,.bashrc,.bash_logout三个配置文件，这三个文件存在于用户根目录，即$HOME目录，Linux中以“.”开头的文件为隐藏文件。
+			$HOME/.bash_profile是最重要的配置文件，当莫Linux用户登录时，Shell会自动执行	.bash_profile文件，如果.bash_profile文件不存在，则自动执行系统默认的配置文件/etc/profile。
+			
+	位置参数
+		位置参数（positional parameters）是一种特殊的Shell变量，用于从命令行向Shell脚本传递参数，$1表示第一个参数、$2表示第二个参数、$0为脚本名字。$*和$@一样，表示从$1开始的全部参数。
+		
+6.2 引用
+	引用符号、名称及其意义
+		""			双引号			引用除美元符号（$）、反引号（`）和反斜杠（\）之外的所有字符
+		''			单引号			引用所有字符
+		``			反引号			Shell将反引号中的内容解释为系统命令
+		\			反斜杠			转义符，屏蔽下一个字符的特殊意义

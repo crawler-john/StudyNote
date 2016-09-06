@@ -1,0 +1,45 @@
+第10章 I/O重定向
+
+10.1 管道
+	10.1.1 管道简介
+		管道技术是Linux的一种基本的进程间通讯技术，它利用先进先出排队模型来指挥进程间的通信。对于管道我们可以将其理解为连接两个实体的一个单向连接器。
+		Linux管道可用于应用程序之间、Linux命令之间，以及应用程序和Linux命令之间的通信，Shell编程主要是利用管道进行Linux命令之间的通信。
+		Shell编程中国管道符号的竖杠符号‘|’，命令之间利用管道进行通信的一般格式为：
+			command1 | command2 | command3 | ... | commandn 
+	10.1.2 cat和more命令
+		cat和more命令都用来显示文件的内容，它们的基本格式为：
+			cat 【option】 fileName
+			more 【option】 【+linenum】 fileName
+	10.1.3 sed命令与管道
+		sed与管道相结合：
+			| sed 【选项】 ‘sed命令’
+	10.1.4 awk命令与管道
+		awk与管道相结合：
+			| awk [-F 域分隔符] 'awk程序段'
+10.2 I/O重定向
+	10.2.1 文件标识符
+		文件标识符是I/O重定向的重要概念。
+			tee用法：  
+				who | tee output  先将who命令的执行结构通过管道传给tee命令，tee命令将who命令的标准输出复制到output文件，因此，结果任然输出who命令的标准输出。
+	10.2.2 I/O重定向符号及其用法
+		基本I/O重定向符号及其意义：
+			cmd1 | cmd2			管道符，将cmd1的标准输出作为cmd2的标准输入
+			> filename			将标准输出写到文件filename之中
+			< filename			将文件filename的内容读入到标准输入之中
+			>> filename			将标准输出写到文件filename之中，若filename文件已存在，则将标准输出最佳到filename已有内容之后
+		    >| filename			即使noclobber选项开启，仍然强制将标准输出写到文件filename之中，即将filename文件覆盖掉
+			n>| filename		即使noclobber选项开启，仍然强制将FD为n的输出写到文件filename之中，即将filename文件覆盖掉
+			n> filename			将FD为n的输出写到文件filename之中
+			n< filename			将文件filename的内容读入到FD n之中
+			n>> filename		将FD为n的输出写到文件filename之中，若filename文件已存在，则将FD为n的输出追加到filename已有内容之后
+			<<delimiter			此处文档
+	10.2.3 exec命令的用法
+		exec命令可以通过文件标识符打开或关闭文件，也可以将文件重定向到标准输入，及将标准输出重定向到文件。
+		高级I/O重定向符号及其意义：
+			n>&m				将FD为m的输出复制到FD为n的文件
+			n<&m				将FD为m的输入复制到FD为n的文件
+			n>&-				关闭FD为n的输出
+			n<&-				关闭FD为n的输入
+			&>file				将标准输出和标准错误输出重定向到文件
+10.3 命令行处理
+	

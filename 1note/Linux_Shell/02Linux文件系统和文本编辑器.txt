@@ -1,0 +1,76 @@
+第二章 Linux文件系统和文本编辑器
+	本章首先介绍用户和用户组的概念以及管理的常用命令；其次，重点介绍文件和目录操作。最后介绍两种文本编辑器。
+	
+2.1 用户和用户组管理
+	Linux是多用户多任务的操作系统，用户（user）和用户组（group）的管理是Linux使用中应该了解和掌握的基础之一。
+	
+	2.1.1 用户管理常用命令
+		用户在系统中是分角色的。用户的角色是通过UID来识别的，用户的UID是全局唯一的。Linux用户可以分为三类。
+			1、root用户（也称超级用户）：系统唯一，是真实的，该用户既可以登录系统，可以操作系统任何文件和命令，拥有最高权限。
+			2、虚拟用户：这类用户也被成为伪用户或假用户，与真实用户区分开来，这类用户不具有登录系统的能力，但确实系统运行不可缺少的用户，比如bin、daemon、adm、ftp、mail等。这类用户是系统自生拥有的，而非来添加的，当然我们也可以添加虚拟用户。
+			3、普通的真实用户：这类用户能登录系统，但是只能操作其根目录下的内容，权限受到限制，这类用户都是系统管理员自行添加的。
+		1.用户账号添加命令--useradd或adduser
+			useradd 【option】 【username】
+				使用了该命令后，会在1、/etc/passwd文件下添加一行记录
+									2、/home目录下创建新用户的主目录，并将/etc/skel目录中的文件复制到该目录。
+				新建的用户暂时无法登录，还需要再用passwd命令设置口令。
+		2.修改用户账号--usermod
+			usermod 【option】 【username】
+		3.删除用户账号命令--userdel
+			userdel 【username】
+		4.用户口令管理命令--passwd
+			passwd 【option】 【username】
+	2.1.2 用户组管理常用命令
+		1.用户组添加命令--groupadd
+			groupadd【option】 【groupname】
+		2.用户组修改命令--groupmod
+			groupmod【option】 【groupname】
+		3.用户组删除命令--groupdel
+			groupdel 【groupname】
+		
+2.2文件和目录操作
+	2.2.1 文件操作常用命令
+		1.文件清单命令--ls
+			ls 【option】 【file or directory】
+		2.文件复制命令--cp
+			cp 【option】 【source】 【destination】
+		3.文件移动命令--mv
+			mv 【option】 【source】 【destination】
+		4.删除文件命令--rm
+			rm 【option】 【file or directory】
+	2.2.2 目录操作常用命令
+		1.创建目录命令--mkdir
+			mkdir 【option】 【directoryName】
+		2.删除目录命令--rmdir
+			rmdir 【option】 【directoryName】
+		3.目录切换命令--cd
+			cd 【directoryName】
+	2.2.3 文件和目录权限管理
+		1.更改文件（目录）权限命令--chmod
+			chmod 【userType】 【signal】 【type】 【filename】
+		  或chmod 【权限（例如777）】 【filename】
+		2.更改文件（目录）属主命令--chown
+			chown 【option】 【owner】 【filename】
+		3.特殊权限命令--SUID与SGID
+			SUID：当一个设置了SUID位的可执行文件被执行时，该文件与所有者的身份运行，也就是说，无论谁来执行这个文件，它都拥有文件所有者的特权，可以任意使用该文件拥有者能使用的全部系统资源。
+			SGID：当一个设置了SGID位的可执行文件被执行时，该文件将具有所属组的特权，任意存取整个组所能使用的系统资源；若一个目录设置了SGID，则所有被复制到这个目录下的文件，其所属的组都会被重设为和这个目录一样，除非复制文件时加上-p选项，才能保留原来所属的群组设置。
+			例chmod u+s 【fileName】
+		      chmod g+s 【fileName】 
+	2.2.4 查找文件命令--find
+		find 【路径】 【选项】 【操作】
+		例子：
+			1.find . -name 't*' -perm 744 -print
+			2.find /etc -type f -name 'rc*' -exec ls -l {} \;
+2.3 文本编辑器
+	2.3.1 vi编辑器
+		vi 【option】 【filename...】
+	  或vim 【option】 【filename...】
+	  输入vi命令打开vi编辑器后，vi编辑器的运行状态共有一下两种模式。
+		1.一般模式
+		2.插入模式
+	2.3.2 gedit编辑器
+		与windows中的操作类似
+		gedit file1 file2 ... filen
+	  
+	  
+		

@@ -1,0 +1,79 @@
+第9章 变量的高级用法
+
+9.1 内部变量
+	内部变量是指能够对bash Shell脚本行为产生影响的变量，他们对Shell及其子Shell都有效。
+	在前面介绍的PWD、SHELL、USER、UID、PPID、PS1、PS2和IFS变量都是内部变量，这里讲介绍完整的内部变量。
+		1.BASH
+			BASH记录了bash Shell的路径，通常为/bin/bash.
+		2.BASH_SUBSHELL
+			BASH_SUBSHELL记录了子Shell的层次
+		3.BASH_VERSINFO
+			BASH_VERSINFO是一个数组，包含6个元素，这6个元素用于表示bash的版本信息。
+		4.BASH_VERSION
+			Linux系统的bash Shell版本包含主次版本、补丁级别、编译版本和发行状态，即BASH_VERSINFO数组取值为0~4。
+		5.DIRSTACK
+			它显示目录栈的栈顶值，栈是一种现行数据结构，遵循后进先出的原则，即最后亚茹栈的元素位于栈顶，它将最早被弹出。
+		6.GLOBIGNORE
+			GLOBIGNORE是由冒号分割的模式列表，表示通配是忽略的文件名集合。
+		7.GROUPS
+			GROUPS记录了当前用户所属的群组，Linux的一个用户可同时包含在多个组内，因此GROUPS是一个数组，数组记录了当前用户所属的所有群组号。
+		8.HOSTNAME
+			记录主机名，Linux主机名是网络配置是必须要设置的参数，我们一般在/etc/sysconfig/network文件中设置主机名。
+		9.HOSTTYPE 和 MACHTYPE
+			都是用于记录系统的硬件架构。实际上他们与BASH_VERSINFO[5]是等值的。
+		10.OSTYPE
+			OSTYPE记录了操作系统类型，Linux系统中，$OSTYPE=linux
+		11.REPLY
+			REPLY变量与read和select命令有关。
+			当read不带任何变量时，从标准输入中获取到的值将会存储到REPLY变量中。
+		12.SECONDS
+			记录脚本从开始执行到结束所耗费的时间。
+		13.SHELLOPTS
+			SHELLOPTS记录了处于“开”状态的Shell选项（options）列表，它是一个只读变量。
+		14.SHLVL
+			记录了bash Shell嵌套的层次。
+		15.TMOUT
+			TMOUT变量用于设置Shell的过期时间，当TMOUT不为0时，Shell在TMOUT秒后将自动注销。
+9.2字符串处理
+	expr是Linux中一个功能十分强大的命令，它引出通用求值表达式，可以实现算术操作、比较操作、字符串操作和逻辑操作等功能。
+		1.${#...}和expr length
+			bash Shell提供多种计算字符串长度的方法。
+				${#string}
+				expr length "$string"			包含空格的必须用“”引起来
+		2.expr index
+			在字符串$string上匹配$substring中字符第一次出现的位置，匹配不到返回0
+			expr的索引命令格式为：
+				expr index $string $substring
+		3.expr match
+			在string的开头开始匹配substring字符串，返回匹配到的substring字符串的长度，若string开头匹配不到substring，则返回0.
+			expr match命令的格式为：
+				expr match $string $substring
+		4.抽取子串
+			(1) #{string:position}
+			(2) #{string:position:length}
+		5.删除子串
+			(1)	$(string#substring)
+			(2) ${string##substring}
+		6.替换字符串
+			(1)${string/substring/replacestring}
+			(2)${string//substring/replacestring}
+9.3 有类型变量
+	Shell变量一般是无类型的，但是bash Shell提供了declare和typeset两个命令用于指定变量的类型，两个变量是玩完全等价的。
+	declare命令的格式为：
+		declare 【选项】 变量名
+	declare命令的选项及其意义
+		-r			将变量设置为只读属性
+		-i			将变量定义为整型数
+		-a			将变量定义为数组
+		-f			显示此脚本定义过得所有函数名及其内容
+		-F			仅显示此脚本前定义过的所有函数名
+		-x			将变量声明为环境变量
+9.4 间接变量引用
+	bash Shell提供了两种格式实现间接变量的引用：
+		(1)eval tempver=\$$variable1
+		(2)tempvar=${!variable1}
+9.5 bash数学运算
+	9.5.1 expr命令
+		expr 运算内容				（运算内容注意转义）
+	9.5.2 bc运算器
+		bc是一种内建的运算器，是bash Shell中最常用的浮点数运算工具。

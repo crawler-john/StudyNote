@@ -1,0 +1,140 @@
+第7章 退出、测试、判断及操作符
+
+7.1 退出状态
+	在Linux系统中，每当命令执行完成后，系统都会返回一个退出状态。该退出状态用一个整数值表示，用于判断命令运行正确与否。
+	退出状态及含义：
+		0			表示运行成功，程序执行未遇到任何问题
+		1~125		表示运行失败，脚本命令、系统命令错误或参数传递错误
+		126			知道到了该命令但无法执行
+		127			未找到要运行的命令
+		>128		命令被系统强行结束
+7.2 测试
+	Linux的Shell命令中存在一组测试命令，该命令用于测试某种条件或某几种条件是否真实存在。
+	7.2.1 测试结构
+		测试命令有两种方式，一种是使用test命令进行测试，该命令的格式为：
+			test expression
+		由于在Linux Shell编程中test命令使用很多，所以，为了提高命令的可读性，可以使用另一种命令格式：
+		[ expression ]
+	7.2.2 整数比较运算符
+		tets测试数值是会有一整套的整数比较运算符，其格式为：
+			test “num1” numeric_operator “num2”
+		或者是
+			[ “num1” numeric_operator “num2” ]
+		整数比较运算符
+			num1 -eq num2		如果num1等于num2，测试结果为0
+			num1 -ge num2		如果num1大于或等于num2，测试结果为0
+			num1 -gt num2		如果num1大于num2，测试结果为0
+			num1 -le num2		如果num1小于或等于num2，测试结果为0
+			num1 -lt num2		如果num1小于num2，测试结果为0
+			num1 -ne num2		如果num1不等于num2，测试结果为0
+	7.2.3 字符串运算符
+		字符串运算符
+			string				测试字符串string是否不为空
+			-n string 			测试字符串string是否不为空
+			-z string			测试字符串string是否为空
+			string1 = string2	测试字符串string1是否与string2相同
+			string1 != string2	测试字符串string1是否与string2不相同
+		对于第一种方式，只能用string进行测试时要特别注意该方式仅有一种格式：
+			test string
+	7.2.4 文件操作符
+		Linux Shell提供了大量的文件操作符，这样可以完成测试文件的各种操作。其格式为:
+			test file_operator file
+		或者为：
+			[ file_operator file ]
+		文件操作符：
+			-d file				测试file是否为目录
+			-e file				测试file是否存在
+			-f file				测试file是否为普通文件
+			-r file				测试file是否是进程可读文件
+			-s file				测试file的长度是否不为0
+			-w file				测试file是否是进程可写文件
+			-x file				测试file是否是进程可执行文件
+			-L file				测试file是否符号化链接
+	7.2.5 逻辑运算符
+		逻辑运算符用于测试多个条件是否为真或为假，或使用逻辑非测试单个表达式，这些运算符在Shell编程中经常用到。
+		逻辑操作符:
+			! expression				如果expression为假，则测试结果为真
+			expression1 -a expression2	如果expression1和expression2同时为真，则测试结果为真
+			expression1 -o expression2	如果expression1和expression2中有一个为真，则测试结果为真
+7.3 判断
+	7.3.1 简单if结构
+		简单的if语句是条件语句的一种格式：
+			if expression
+			then
+				command
+				command
+				...
+			fi
+		要特别注意测试条件后如果没有“;”，则then语句要换行，否则会产生不必要的错误。如果if和then可以处于同一行，则必须用“;”来终止if语句，其格式为：
+			if expression; then
+				command
+				command
+				...
+			fi	
+	7.3.2 exit命令
+		由于判断语句和循环语句都涉及到exit命令来控制程序和表达式的流程。在Linux Shell中也存在这样的内建命令。命令格式为：
+			exit status
+	7.3.3 if/else结构
+		语法格式：
+			if expression1
+			then
+				command
+				...
+			else
+				command
+				...
+			fi
+	7.3.4 if/elif/else结构
+		语法格式：
+			if expression1
+			then
+				command
+				...
+			elif expression2
+			then
+				command
+				...
+			elif expressionN
+			then
+				command
+				...	
+			else
+				command
+				...
+			fi	
+	7.3.5 case结构
+		语法格式：
+			case variable in
+			value1)
+				command
+				...
+				command;;
+			value2)
+				command
+				...
+				command;;
+			valueN)
+				command
+				...
+				command;;
+			*)
+				command
+				...
+				command;;
+			esac
+7.4 运算符
+	7.4.1 算术运算符
+		在Linux Shell中，算术运算符包括：+、-、*、/、%、**（幂运算）。
+	7.4.2 位运算符
+		<<		左移
+		>>		右移
+		&		按位与
+		|		按位或
+		~		按位非
+		^		按位异或
+	7.4.3 自增自减运算符
+		++、--
+	7.4.4 数字常量
+		Linux Shell脚本或命令默认将数字以十进制的方式进行处理，如果要使用其他进制的方式进行处理，则需要对这些数字进行特定的标记或加前缀。
+			当使用0作为前缀时，表示八进制；
+			当使用0x进行标记时，表示十六进制，同时还可以使用num#这种形式标记进制数

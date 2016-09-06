@@ -1,0 +1,17 @@
+该指令是强制同步远端master分支为当前本地master分支位置的操作，使用一定要谨慎，一般不建议这样操作
+
+1. 执行如下指令强制同步：
+
+user@local$ git push origin +master:master --force
+
+2. 如返回错误，则尝试ssh登录服务器，进入远端GIT库中并执行如下指令设置:
+
+
+
+user@remote$ git config receive.denyNonFastforwards false
+
+
+3. 再执行第1步指令操作；
+
+4. 最后恢复远端GIT库设置，ssh登录服务器并执行：
+user@remote$ git config receive.denyNonFastforwards true

@@ -1,0 +1,67 @@
+第8章 循环与结构化命令
+	在Shell中提供三种常用的循环语句，分别是for循环语句、while循环语句和until循环语句。
+	
+8.1 for循环
+	for循环是Linux Shell中最常用的结构。for循环有三种结构：一种是列表for循环；第二种是不带列表for循环；第三种结构是类C风格的for循环。
+	8.1.1 列表for循环
+		列表for循环语句用于将一组命令执行已知的次数，下面给出了for循环的基本格式：
+			for variable in （list）
+			do
+				command
+				command
+				...
+			done
+	8.1.2 不带列表for循环
+		其中循环的参数为用户在命令行中的输入
+			for variable
+			do
+				command
+				command
+				...
+			done
+		相当于
+			for variable in "$@"
+			do
+				command
+				command
+				...
+			done
+	8.1.3 类C风格的for循环
+		类C风格的for循环也可以被称为计数循环，一般用于循环次数已知的情况。
+			for (( expr1; erpr2; expr3 ))
+			do
+				command
+				command
+				...
+			done
+8.2 while循环
+	while循环格式如下：
+		while expression
+		do
+			command
+			command
+			...
+		done
+8.3 until循环
+	until循环的结构：
+		until expression
+		do
+			command
+			command
+			...
+		done
+		
+8.5 循环控制符
+	8.5.1 break循环控制符
+		break循环控制符应用在for、while和until循环语句中，用于强行退出循环。
+	8.5.2 continue循环控制符
+		continue循环控制符应用于for、while和until循环语句中，用于让脚本跳过其后的语句。
+8.6 select结构
+	select结构从技术角度来说不能算是循环结构，因为其不对可执行结果的代码块进行循环操作。
+	基本结构：
+		select variable in {list}
+		do
+			command
+			...
+			break
+		done
