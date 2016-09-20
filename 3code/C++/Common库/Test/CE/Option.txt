@@ -1,0 +1,4 @@
+/I..\..\Source
+/DWIN32
+/GR
+/EHsc
