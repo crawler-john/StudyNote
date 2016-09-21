@@ -1,0 +1,7 @@
+---- eMBTCPInit Matches (6 in 6 files) ----
+Demo.c (demo\linuxtcp):    if( eMBTCPInit( MB_TCP_PORT_USE_DEFAULT ) != MB_ENOERR )
+Demo.c (demo\mcf5235tcp):        if( eMBTCPInit( MB_TCP_PORT_USE_DEFAULT ) != MB_ENOERR )
+Demo.c (demo\str71xtcp):                if( eMBTCPInit( MB_TCP_PORT_USE_DEFAULT ) != MB_ENOERR )
+Demo.cpp (demo\win32tcp):    if( eMBTCPInit( MB_TCP_PORT_USE_DEFAULT ) != MB_ENOERR )
+Mb.c (modbus):eMBTCPInit( USHORT ucTCPPort )
+Mb.h (modbus\include):eMBErrorCode    eMBTCPInit( USHORT usTCPPort );
