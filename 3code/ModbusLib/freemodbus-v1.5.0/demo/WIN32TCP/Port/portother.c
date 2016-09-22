@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "winsock2.h"
+#include <windows.h>
 
 #include "port.h"
 
@@ -168,4 +169,10 @@ vMBPortLog( eMBPortLogLevel eLevel, const TCHAR * szModule, const TCHAR * szFmt,
     va_start( args, szFmt );
     _vftprintf( stderr, szFmt, args );
     va_end( args );
+}
+
+void
+vMBPortTimersDelay(USHORT usTimeOutMS)
+{
+	Sleep(usTimeOutMS);
 }

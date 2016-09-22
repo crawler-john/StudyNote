@@ -64,7 +64,7 @@ _tmain( int argc, _TCHAR * argv[] )
 
     const UCHAR     ucSlaveID[] = { 0xAA, 0xBB, 0xCC };
 
-    if( eMBInit( MB_RTU, 0x0A, 1, 38400, MB_PAR_EVEN ) != MB_ENOERR )
+    if( eMBInit( MB_RTU, 0x01, 1, 38400, MB_PAR_EVEN ) != MB_ENOERR )
     {
         _ftprintf( stderr, _T( "%s: can't initialize modbus stack!\r\n" ), PROG );
         iExitCode = EXIT_FAILURE;
