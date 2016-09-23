@@ -28,7 +28,7 @@
 /*  hereabove terms and conditions.                                          */
 /*                                                                           */
 /*****************************************************************************/
-CSem:: CSem()
+
 
 /*****************************************************************************/
 /*  History:                                                                 */
@@ -100,7 +100,7 @@ CSem:: CSem()
 /*   Semaphore class                                                         */
 /*                                                                           */
 /*****************************************************************************/
-class CSem
+class CSem		//旗语基类
 {
     public:
 
@@ -134,7 +134,7 @@ class CSem
         /*********************************************************************/
 
 
-    protected:
+    protected:	//构造函数写在保护区，只有子类可以使用
 
         /*********************************************************************/
         /*                            Variables                              */
@@ -158,13 +158,13 @@ class CSem
 /*   Binary semaphore class                                                  */
 /*                                                                           */
 /*****************************************************************************/
-class CBinarySem: public CSem
+class CBinarySem: public CSem		//二进制旗语类
 {
     public:
 
         enum EInitialState
         {
-            EMPTY = OS_SEM_EMPTY,
+            EMPTY = OS_SEM_EMPTY,		
             FULL = OS_SEM_FULL
         };
 
@@ -226,7 +226,7 @@ class CBinarySem: public CSem
 /*   Counting semaphore class                                                */
 /*                                                                           */
 /*****************************************************************************/
-class CCountingSem: private CSem
+class CCountingSem: private CSem		//计数旗语类
 {
     public:
 
@@ -289,7 +289,7 @@ class CCountingSem: private CSem
 /*   Synchronous  class                                                      */
 /*                                                                           */
 /*****************************************************************************/
-class CSync
+class CSync			//同步信息类
 {
     public:
 
@@ -353,7 +353,7 @@ class CSync
 /*   Mutex class for accessing critical sections                             */
 /*                                                                           */
 /*****************************************************************************/
-class CMutex
+class CMutex			//互斥量
 {
     public:
 
@@ -413,7 +413,7 @@ class CMutex
 /*   Auto lock class for accessing mutex                                     */
 /*                                                                           */
 /*****************************************************************************/
-class CLock
+class CLock				//自动互斥量锁类
 {
     public:
 
@@ -474,7 +474,7 @@ class CLock
 /*   Condition class                                                         */
 /*                                                                           */
 /*****************************************************************************/
-class CCondition
+class CCondition			//条件类
 {
     public:
 
@@ -540,7 +540,7 @@ class CCondition
 /*  Variable Declarations                                                    */
 /*                                                                           */
 /*****************************************************************************/
-
+//CSem:: CSem()
 
 /*****************************************************************************/
 /*                                                                           */

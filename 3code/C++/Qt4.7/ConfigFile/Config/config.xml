@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<!---------------------------------------------------------------------------->
+<!--                Configuration file for Gate Application                 -->
+<!---------------------------------------------------------------------------->
+
+<!---------------------------------------------------------------------------->
+<!-- Note: Please don't add comments before the xml version line, otherwise it 
+           will casue xml parsing error                                     -->
+<!---------------------------------------------------------------------------->
+
+<!-- Start of xml document -->
+<config>
+    <!-- Screen Display Module -->
+    <module name="ScreenDisp">
+        <item name="PIDNumber">1</item>              <!-- PID number -->
+        <item name="PIDArea">0</item>                <!-- PID exists on area: 
+                                                            0 - unpaid area
+                                                            1 - paid area
+                                                            2 - both area -->
+    </module>
+    <!-- Date time display thread module -->
+    <module name="ScreenDisp/DateTimeThread">
+        <item name="threadpriority">1</item>         <!-- thread priority: 
+                                                            priority range: 0 ~ 7 
+                                                              0 - the lowest priority 
+                                                              6 - the highest priority 
+                                                              7 - the same as its father thread -->
+        <item name="stacksize">20000</item>          <!-- thread stack size -->
+    </module>
+
+    <!-- Trace Log Module -->
+    <module name="TraceLog">
+        <item name="TraceLogLevel">0x1e</item>         <!-- TraceLogLevel:
+                                                         0x10 - fatal level message enable mask
+                                                         0x08 - error level message enable mask
+                                                         0x04 - high level message enable mask
+                                                         0x02 - mid level message enable mask
+                                                         0x01 - low level message enable mask -->
+    </module>
+
+</config> <!-- End of xml document -->
+

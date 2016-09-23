@@ -1003,7 +1003,7 @@ void serialTest()
     char cCh = 0;
     char inputStr[128];
     CSimpleSerial *pSimpleSerial = NULL;
-    CFileTransferSerial *pFileTransferSerial[16] = NULL;
+    CFileTransferSerial *pFileTransferSerial[16] = {NULL};
     unsigned int nFileTransferInProgressNum = 0;
 
     printf("**************************\n");

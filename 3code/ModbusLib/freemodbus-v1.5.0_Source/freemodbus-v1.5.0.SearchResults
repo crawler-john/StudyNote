@@ -1,7 +1,28 @@
----- eMBTCPInit Matches (6 in 6 files) ----
-Demo.c (demo\linuxtcp):    if( eMBTCPInit( MB_TCP_PORT_USE_DEFAULT ) != MB_ENOERR )
-Demo.c (demo\mcf5235tcp):        if( eMBTCPInit( MB_TCP_PORT_USE_DEFAULT ) != MB_ENOERR )
-Demo.c (demo\str71xtcp):                if( eMBTCPInit( MB_TCP_PORT_USE_DEFAULT ) != MB_ENOERR )
-Demo.cpp (demo\win32tcp):    if( eMBTCPInit( MB_TCP_PORT_USE_DEFAULT ) != MB_ENOERR )
-Mb.c (modbus):eMBTCPInit( USHORT ucTCPPort )
-Mb.h (modbus\include):eMBErrorCode    eMBTCPInit( USHORT usTCPPort );
+---- eMBRegDiscreteCB Matches (27 in 26 files) ----
+Demo.c (demo\at91sam7x_rowley):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Demo.c (demo\atsam3s):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Demo.c (demo\atsam3s_freertos):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Demo.c (demo\avr):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Demo.c (demo\bare):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Demo.c (demo\hcs08):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Demo.c (demo\linux):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Demo.c (demo\linuxtcp):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Demo.c (demo\lpc214x):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Demo.c (demo\mcf5235):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Demo.c (demo\mcf5235cw):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Demo.c (demo\mcf5235tcp):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Demo.c (demo\msp430):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Demo.c (demo\str71xgcc):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Demo.c (demo\str71xtcp):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Demo.c (demo\z8encore):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Demo.cpp (demo\win32):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Demo.cpp (demo\win32tcp):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Excoils.c (demo\avr):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Excoils.c (demo\str71x):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Exdisc.c (demo\str71x):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Exholding.c (demo\str71x):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Mb.h (modbus\include): * \see eMBRegHoldingCB( ), eMBRegCoilsCB( ), eMBRegDiscreteCB( ) and 
+Mb.h (modbus\include):eMBErrorCode    eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress,
+Mbfuncdisc.c (modbus\functions):                eMBRegDiscreteCB( pucFrameCur, usRegAddress, usDiscreteCnt );
+Simple.c (demo\str71x):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )
+Simple2.c (demo\str71x):eMBRegDiscreteCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete )

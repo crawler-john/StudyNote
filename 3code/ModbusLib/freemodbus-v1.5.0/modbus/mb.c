@@ -145,8 +145,7 @@ eMBInit( eMBMode eMode, UCHAR ucSlaveAddress, UCHAR ucPort, ULONG ulBaudRate, eM
         {
 #if MB_RTU_ENABLED > 0
         case MB_RTU:
-/*
-			pvMBFrameStartCur = eMBRTUStart;
+	    pvMBFrameStartCur = eMBRTUStart;
             pvMBFrameStopCur = eMBRTUStop;
             peMBFrameSendCur = eMBRTUSend;
             peMBFrameReceiveCur = eMBRTUReceive;
@@ -156,12 +155,10 @@ eMBInit( eMBMode eMode, UCHAR ucSlaveAddress, UCHAR ucPort, ULONG ulBaudRate, eM
             pxMBPortCBTimerExpired = xMBRTUTimerT35Expired;
 
             eStatus = eMBRTUInit( ucMBAddress, ucPort, ulBaudRate, eParity );
-*/
             break;
 #endif
 #if MB_ASCII_ENABLED > 0
         case MB_ASCII:
-/*
             pvMBFrameStartCur = eMBASCIIStart;
             pvMBFrameStopCur = eMBASCIIStop;
             peMBFrameSendCur = eMBASCIISend;
@@ -172,7 +169,6 @@ eMBInit( eMBMode eMode, UCHAR ucSlaveAddress, UCHAR ucPort, ULONG ulBaudRate, eM
             pxMBPortCBTimerExpired = xMBASCIITimerT1SExpired;
 
             eStatus = eMBASCIIInit( ucMBAddress, ucPort, ulBaudRate, eParity );
-*/
             break;
 #endif
         default:

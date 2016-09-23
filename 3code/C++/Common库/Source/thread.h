@@ -88,7 +88,7 @@
 #endif
 
 #if defined(_WIN32)
-#if !defined(UNDER_CE)
+#if !defined(UNDER_CE)		//	不是WINCE
 #define THREAD_MAX_PRIORITY             THREAD_PRIORITY_TIME_CRITICAL
 #define THREAD_VERY_HIGH_PRIORITY       THREAD_PRIORITY_HIGHEST
 #define THREAD_HIGH_PRIORITY            THREAD_PRIORITY_ABOVE_NORMAL
@@ -96,7 +96,7 @@
 #define THREAD_LOW_PRIORITY             THREAD_PRIORITY_BELOW_NORMAL
 #define THREAD_VERY_LOW_PRIORITY        THREAD_PRIORITY_LOWEST
 #define THREAD_MIN_PRIORITY             THREAD_PRIORITY_IDLE
-#else
+#else				//WinCE
 #define THREAD_MAX_PRIORITY             153
 #define THREAD_VERY_HIGH_PRIORITY       160
 #define THREAD_HIGH_PRIORITY            180
@@ -105,7 +105,7 @@
 #define THREAD_VERY_LOW_PRIORITY        240
 #define THREAD_MIN_PRIORITY             255
 #endif
-#elif defined(__linux)
+#elif defined(__linux)	//Linux
 // here we use regular realtime thread priority setting
 // if we want to use time critical realtime thread, it needs to use:
 //     struct sched_param param;  // scheduling priority
@@ -140,7 +140,7 @@ typedef pthread_t ThreadID_t;
 /*   Runable class                                                           */
 /*                                                                           */
 /*****************************************************************************/
-class IRunnable
+class IRunnable		//符合可运行属性的类的基本功能接口
 {
     public:
 
@@ -161,14 +161,14 @@ class CThread
 
         enum EExitCode
         {
-            RUNNING                             = 1,
-            SUCCESS                             = 0,
-            STOPPED                             = -1,
-            ABORTED                             = -2,
-            EXITED_WITH_UNHANDLED_EXCEPTION     = -3,
-            ASSERTION_FAILED                    = -4,
-            KILLED                              = -5,
-            EXITED_WITH_UNEXPECTED_EXCEPTION    = -6
+            RUNNING                             = 1,		//线程运行中
+            SUCCESS                             = 0,		//线程退出成功
+            STOPPED                             = -1,	//线程已正常停止
+            ABORTED                             = -2,	//线程已异常中止
+            EXITED_WITH_UNHANDLED_EXCEPTION     = -3,	//线程由于未处理异常退出
+            ASSERTION_FAILED                    = -4,			//线程断言失败退出
+            KILLED                              = -5,					//线程被杀死
+            EXITED_WITH_UNEXPECTED_EXCEPTION    = -6	//线程由于未知异常退出
         };
 
         /*********************************************************************/
@@ -231,8 +231,8 @@ class CThread
         int             m_priority;
         int             m_attributes;
         EExitCode       m_exitCode;
-        CSync           m_startedSync;
-        CSync           m_joinSync;
+        CSync           m_startedSync;	//线程开始同步
+        CSync           m_joinSync;	//线程结束同步
         DECLARE_THREAD_SAFE
 
 

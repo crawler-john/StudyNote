@@ -242,7 +242,7 @@ class CSerialExt: public CSerial
         }
 };
 
-class CTestSerial: public CThread, public CSerial
+class CTestSerial: public CThread
 {
     public:
         CTestSerial(void);
@@ -451,7 +451,7 @@ void testCMutex()
     }
 
     printf("Try to take mutex ... ");
-    if(mut.take(2000))
+    if(mut.take(2000))
     {
         printf("Result: take mutex OK\n");
     }

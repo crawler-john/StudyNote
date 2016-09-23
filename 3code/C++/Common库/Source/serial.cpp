@@ -926,6 +926,33 @@ bool CSerial::initInstance(const char* pPortName, unsigned long baudRate,
                 case 230400:
                     xNewSpeed = B230400;
                     break;
+		case 460800:
+			xNewSpeed = B460800;
+			break;
+		case 500000:
+			xNewSpeed = B500000;
+			break;
+		case 576000:
+			xNewSpeed = B576000;
+			break;
+		case 921600:
+			xNewSpeed = B921600;
+			break;
+		case 1000000:
+			xNewSpeed = B1000000;
+			break;
+		case 1152000:
+			xNewSpeed = B1152000;
+			break;
+		case 1500000:
+			xNewSpeed = B1500000;
+			break;
+		case 2000000:
+			xNewSpeed = B2000000;
+			break;
+		case 2500000:
+			xNewSpeed = B2500000;
+			break;
             }
             xTIO.c_cc[VTIME] = 0; // timeout
             xTIO.c_cc[VMIN] = 1; // define the minimum bytes data to be readed
@@ -1306,6 +1333,33 @@ void CSerial::setBaudRate(unsigned long baudRate)
             case 230400:
                 xNewSpeed = B230400;
                 break;
+	    case 460800:
+		xNewSpeed = B460800;
+		break;
+	    case 500000:
+		xNewSpeed = B500000;
+		break;
+	    case 576000:
+		xNewSpeed = B576000;
+		break;
+	    case 921600:
+		xNewSpeed = B921600;
+		break;
+	    case 1000000:
+		xNewSpeed = B1000000;
+		break;
+	    case 1152000:
+		xNewSpeed = B1152000;
+		break;
+	    case 1500000:
+		xNewSpeed = B1500000;
+		break;
+	    case 2000000:
+		xNewSpeed = B2000000;
+		break;
+	    case 2500000:
+		xNewSpeed = B2500000;
+		break;
         }
         if(tcflush(m_id, TCIOFLUSH) == -1)
         {
