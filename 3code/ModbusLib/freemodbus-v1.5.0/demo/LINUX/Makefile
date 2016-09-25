@@ -20,7 +20,8 @@ INSIGHT     = /opt/insight-x86/bin/insight
 # project specifics
 # ---------------------------------------------------------------------------
 CFLAGS	    = -MD -g3 -Wall -Iport -I../../modbus/rtu \
-		-I../../modbus/ascii -I../../modbus/include 
+		-I../../modbus/ascii -I../../modbus/include \
+		-I../../modbus/tcp
 LDFLAGS     =
 ifeq ($(CYGWIN_BUILD),YES)
 else

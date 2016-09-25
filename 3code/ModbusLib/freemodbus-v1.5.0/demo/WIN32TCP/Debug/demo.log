@@ -1,0 +1,41 @@
+﻿  porttcp.c
+d:\study\studynote\3code\modbuslib\freemodbus-v1.5.0\demo\win32tcp\port\porttcp.c(144): warning C4996: 'inet_ntoa': Use inet_ntop() or InetNtop() instead or define _WINSOCK_DEPRECATED_NO_WARNINGS to disable deprecated API warnings
+  c:\program files (x86)\windows kits\8.1\include\um\winsock2.h(1868): note: 参见“inet_ntoa”的声明
+  portother.c
+d:\study\studynote\3code\modbuslib\freemodbus-v1.5.0\demo\win32tcp\port\portother.c(124): warning C4474: _snwprintf_s: 格式字符串中传递的参数太多
+  d:\study\studynote\3code\modbuslib\freemodbus-v1.5.0\demo\win32tcp\port\portother.c(124): note: 占位符和其参数预计 0 可变参数，但提供的却是 1 参数
+  portevent.c
+  mbtcp.c
+  mbrtu.c
+  mbcrc.c
+  mb.c
+d:\study\studynote\3code\modbuslib\freemodbus-v1.5.0\modbus\mb.c(201): warning C4013: “eMBTCPDoInit”未定义；假设外部返回 int
+  mbutils.c
+  mbfuncother.c
+  mbfuncinput.c
+  mbfuncholding.c
+  mbfuncdisc.c
+  mbfuncdiag.c
+  mbfunccoils.c
+  mbascii.c
+  正在生成代码...
+  stdafx.cpp
+  demo.cpp
+  正在生成代码...
+mbascii.obj : warning LNK4075: 忽略“/EDITANDCONTINUE”(由于“/SAFESEH”规范)
+mbascii.obj : error LNK2019: 无法解析的外部符号 _xMBPortSerialInit，该符号在函数 _eMBASCIIInit 中被引用
+mbrtu.obj : error LNK2001: 无法解析的外部符号 _xMBPortSerialInit
+mbascii.obj : error LNK2019: 无法解析的外部符号 _vMBPortSerialEnable，该符号在函数 _eMBASCIISend 中被引用
+mbrtu.obj : error LNK2001: 无法解析的外部符号 _vMBPortSerialEnable
+mbascii.obj : error LNK2019: 无法解析的外部符号 _xMBPortSerialGetByte，该符号在函数 _xMBASCIIReceiveFSM 中被引用
+mbrtu.obj : error LNK2001: 无法解析的外部符号 _xMBPortSerialGetByte
+mbascii.obj : error LNK2019: 无法解析的外部符号 _xMBPortSerialPutByte，该符号在函数 _xMBASCIITransmitFSM 中被引用
+mbrtu.obj : error LNK2001: 无法解析的外部符号 _xMBPortSerialPutByte
+mbascii.obj : error LNK2019: 无法解析的外部符号 _xMBPortTimersInit，该符号在函数 _eMBASCIIInit 中被引用
+mbrtu.obj : error LNK2001: 无法解析的外部符号 _xMBPortTimersInit
+mbascii.obj : error LNK2019: 无法解析的外部符号 _vMBPortTimersEnable，该符号在函数 _xMBASCIIReceiveFSM 中被引用
+mbrtu.obj : error LNK2001: 无法解析的外部符号 _vMBPortTimersEnable
+mbascii.obj : error LNK2019: 无法解析的外部符号 _vMBPortTimersDisable，该符号在函数 _eMBASCIIStop 中被引用
+mbrtu.obj : error LNK2001: 无法解析的外部符号 _vMBPortTimersDisable
+mb.obj : error LNK2019: 无法解析的外部符号 _vMBPortClose，该符号在函数 _eMBInit 中被引用
+D:\study\StudyNote\3code\ModbusLib\freemodbus-v1.5.0\demo\WIN32TCP\Debug\demo.exe : fatal error LNK1120: 8 个无法解析的外部命令

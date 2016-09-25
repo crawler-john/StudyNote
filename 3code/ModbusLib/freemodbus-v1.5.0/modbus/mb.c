@@ -44,12 +44,12 @@
 
 #include "mbport.h"
 #if MB_RTU_ENABLED == 1
-//#include "mbrtu.h"
+#include "mbrtu.h"
 #endif
 #if MB_ASCII_ENABLED == 1
-//#include "mbascii.h"
+#include "mbascii.h"
 #endif
-#if MB_TCP_ENABLED == 1
+#if MB_TCP_ENABLED == 0
 #include "mbtcp.h"
 #endif
 
@@ -193,6 +193,7 @@ eMBInit( eMBMode eMode, UCHAR ucSlaveAddress, UCHAR ucPort, ULONG ulBaudRate, eM
 }
 
 #if MB_TCP_ENABLED > 0
+/*
 eMBErrorCode
 eMBTCPInit( USHORT ucTCPPort )
 {
@@ -204,7 +205,7 @@ eMBTCPInit( USHORT ucTCPPort )
     }
     else if( !xMBPortEventInit(  ) )
     {
-        /* Port dependent event module initalization failed. */
+        //Port dependent event module initalization failed. 
         eStatus = MB_EPORTERR;
     }
     else
@@ -220,6 +221,8 @@ eMBTCPInit( USHORT ucTCPPort )
     }
     return eStatus;
 }
+*/
+
 #endif
 
 eMBErrorCode
