@@ -1,0 +1,104 @@
+基于gSOAP的WebService开发指导说明书
+
+1.简介
+	1.1 目的
+		本文通过给出gSOAP库的基本使用样例，帮助开发人员进行WebService相关的开发
+	1.2 范围
+		本文只包含gSOAP库C++版本的使用样例，不包含其他高级使用或C版本使用方式
+	1.3 名词解释
+	
+	1.4 参考资料
+		gSOAP 2.8.36 User Guide
+
+2.准备工作
+	2.1 gSOAP库
+		很显然，要想基于gSOAP库开发WebService应用，你需要首先获取gSOAP库。
+		gSOAP库是一个开源库，你可以在一下网址进行下载：
+			http://sourceforge.net/project/showfiles.php?group_id=52781
+		如果链接失效，也可以去一个介绍gSOAP的网站上查看最新下载地址：
+			http://www.cs.fsu.edu/~engelen/soap.html
+		本文所用的版本为（soapcpp2）：gSOAP2.8.36
+		
+		注意这两个文件：stdsoap2.h和stdsoap2.cpp，我们编写gSOAP程序的时候是需要它们的。还要注意的是bin\win32目录下的两个可执行文件：soapcpp2.exe和wsdl2h.exe，目前我们只需要soapcpp2.exe。
+		也就是说，要使用gSOAP，我们需三个文件：
+			解压目录\gsoap-2.8\gsoap\?stdsoap2.h
+			解压目录\gsoap-2.8\gsoap\?stdsoap2.cpp
+			解压目录\gsoap-2.8\gsoap\bin\win32\soapcpp2.exe
+		使用gSOAP不需要在程序中添加额外的库，而是要通过工具生成并包含额外的文件。接下来，我们通过一个实例去了解如何使用gSOAP提供的这三个文件。
+
+3.创建一个WebService服务端工程
+	gSOAP使用了代码生成器帮助我们生成一些辅助性的框架与类，所以我们想要使用gSOAP，则需要做一些额外的工作。
+	下面我们就从零开始构建一个使用gSOAP的服务端工程。
+	
+	3.1 新建一个工程
+		这一步没什么难度，使用VS直接新建一个工程即可。
+		我们可以建立任意的C++工程，为了可以未来和Qt进行结合，我们新建一个QtApplication
+		解决方案名字，工程名，类名与Widget类型不重要，我们可以随意决定。
+	3.2 拷贝必要的文件  
+		为了使用gSOAP，我们需要向我们的工程目录下拷贝一些必要的文件：
+		
+		它们原本所在的地方为：  
+			解压目录\gsoap-2.8\gsoap\ stdsoap2.h 
+			解压目录\gsoap-2.8\gsoap\ stdsoap2.cpp  
+			解压目录\gsoap-2.8\gsoap\bin\win32\ soapcpp2.exe
+	3.3 写WebService接口函数
+		gSOAP可以使我们像是用本地函数一样调用WebService，所以我们首先要做的就是定义WebService接口函数，新建一个头文件，名字随意（我们使用soapInterface.h），然后按照以下格式书写函数：
+		
+			//gsoap ns service name: Echo
+			//gsoap ns service protocol:SOAP
+			//gsoap ns service style: rpc
+
+			#include <string>
+
+			int ns__echo(std::string str,std::string &resault);
+			int ns__login(std::string account,std::string password,std::string mode,std::string &resault);
+		注意：前三行的注释是必要的，并且必须符合语法规则，其中ns表示的是WebService的基本命名空间，默认ns即可，而冒号后面，则是以下含义：
+			//gsoap ns service name: WebService的名字，随意即可，它只关系到最终生成的文件和类的名字，只要符合其实际的含义，名字随意
+			//gsoap ns service protocol: WebService所用协议，默认SOAP即可
+			//gsoap ns service style: WebService类型，默认rpc即可，表示使用远程调用
+		事实上，只有第一行注释是有意义的，剩下两行都如果不存在则会使用默认值——那其实就是我们定义的值，但是为了更加清晰，最好可以使用全部的三行注释（事实上，完整的注释有更多行，但是尚未清楚其意义。）
+		然后，包含必要的头文件，使得函数声明合法。（例如，为了使用std::string，我们需要包含string头文件）
+		注意：不支持Qt类，不支持const引用参数，不支持标准库中的容器。
+		最后，就是一条一条地定义WebService方法了，其中，方法名，参数与返回值要符合以下规则：
+			返回值必须是int
+			函数名必须要以基本命名空间开头，命名空间后面必须要加两个下划线，两个下划线后面就可以跟随任意的符合命名规范的函数名了
+			参数必须至少有1个
+			最后一个参数表示WebService的返回值，它必须是指针或者引用（因为只有这样我们才能在函数内部修改这个值）
+		其他需要注意的地方：
+			你可以定义多个符合规则的接口文件，这样子会产生多个WebService服务。但是请不要将同一个WebService的接口在多个文件中定义，也不要为不同的WebService服务起相同的名字
+	3.4 写一个方便我们使用的批处理文件
+		soapcpp2.exe使用命令行参数的形式生成文件，为了方便我们可以“一键操作”，我们写一个批处理文件BuildSOAP.bat，内容如下：
+			@echo off
+			mkdir gSOAP 
+			soapcpp2.exe -i -dgSOAP soapInterface.h
+			pause
+		其中，soapInterface.h就是我们刚刚定义好的WebService函数接口，如果存在多个函数接口，则可以写多行相似的命令
+		-dgSOAP则表示要将soapcpp2.exe生成的文件放到gSOAP目录下，这样方便我们将自己的代码与soapcpp2.exe生成的代码分离开（在目录前附加-d即表示输出目录，注意，-d与目录名之间没有空格）
+		加-i表示我们要生成C++类，方便我们使用这个服务。
+		然后我们就可以执行这个批处理文件了，执行完毕后，我们去gSOAP目录下，可以看到以下的生成文件：
+	3.5 完善工作树
+		生成完毕后，我们需要将以下文件加入工程树中：soapC.cpp，为了和我们自己写的代码加以区分，我们新建一个Filter：gSOAP，将这些文件加进去：
+		
+		我们不需要添加头文件，因为在cpp里面已经包含了，VS会自动找到那些头文件的。
+		注意，别忘记之前拷贝进来的两个文件stdsoap2.h，stdsoap2.cpp，我们需要把stdsoap2.cpp也加入工程树中，否则编译时会报错，提示很多函数未实现
+		我们还要再添加一个文件，这个文件就是自动生成的服务的类实现soapEchoService.cpp，没有它，编译时会提示服务类相关的函数未实现
+	3.6 实现服务的逻辑
+		至此，我们的基本工程树就构建完成了，下一步我们要做的就是实现WebService方法。
+		我们添加一个新的文件EchoService.hpp，它将补全一些自动生成无法实现的逻辑——我们声明的服务接口的实现
+		
+		注意：
+		需要包含两个文件，一个是gSOAP自动生成的类声明，一个是命名空间表。其中，类声明头文件的命名方式是soap开头，服务名在中间，并以Service结尾。在某些情况下，它可能不是soap开头的，但是肯定是服务名在中间并以Service结尾。?
+		如果实在不知道头文件或命名空间表的名字，请去生成目录下查看。?
+		两个包含的文件，他们是不需要在工程树中包含的，只需要在代码里包含即可。当然，为了可以方便函数的查找，也可以将其加入工程树中。?
+		gSOAP自动生成的类中，函数没有命名空间与两个下划线的前缀（ns__）。
+		如果函数执行正确，我们就可以返回SOAP_OK（也就是0），否则，返回一个自定义的错误代码。?
+		如果定义了多个接口，则需要写多个文件来实现这些接口。（尽量不要将不相关的两个服务在同一个文件里实现）
+		
+	3.7 在一个独立的线程中启动服务 
+		至此，服务逻辑已经完毕了，接下来我们需要再添加一些代码，使WebService服务可以作为一个独立的程序运行。 
+		我们新建一个继承了QThread的类EchoServer，然后我们实现run方法：
+		
+		注意包含我们添加的实现了服务类接口的文件，否则我们肯定无法使用服务类。
+		然后我们就可以在main函数中启动这个线程了：
+		
+网页：http://wenku.baidu.com/link?url=HPo-hdoztobQn9YWD53185Cg5jXz7ckRxkeUxEvXJ44J4NFzVqlCMZCbaXw9mAxjCjuoZ_WhL79WfPWGaq4lPI9DC_cY_IYr68V2BTbJXOS

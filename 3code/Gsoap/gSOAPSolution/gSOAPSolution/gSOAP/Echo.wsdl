@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions name="Echo"
+  targetNamespace="http://tempuri.org/ns.xsd/Echo.wsdl"
+  xmlns:tns="http://tempuri.org/ns.xsd/Echo.wsdl"
+  xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"
+  xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  xmlns:ns="http://tempuri.org/ns.xsd"
+  xmlns:SOAP="http://schemas.xmlsoap.org/wsdl/soap/"
+  xmlns:HTTP="http://schemas.xmlsoap.org/wsdl/http/"
+  xmlns:MIME="http://schemas.xmlsoap.org/wsdl/mime/"
+  xmlns:DIME="http://schemas.xmlsoap.org/ws/2002/04/dime/wsdl/"
+  xmlns:WSDL="http://schemas.xmlsoap.org/wsdl/"
+  xmlns="http://schemas.xmlsoap.org/wsdl/">
+
+<types>
+
+  <schema targetNamespace="http://tempuri.org/ns.xsd"
+    xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"
+    xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+    xmlns:ns="http://tempuri.org/ns.xsd"
+    xmlns="http://www.w3.org/2001/XMLSchema"
+    elementFormDefault="unqualified"
+    attributeFormDefault="unqualified">
+    <import namespace="http://schemas.xmlsoap.org/soap/encoding/"/>
+  </schema>
+
+</types>
+
+<message name="echoRequest">
+  <part name="str" type="xsd:string"/><!-- ns__echo::str -->
+</message>
+
+<message name="echoResponse">
+  <part name="resault" element="ns:resault"/><!-- ns__echo::resault -->
+</message>
+
+<message name="loginRequest">
+  <part name="account" type="xsd:string"/><!-- ns__login::account -->
+  <part name="password" type="xsd:string"/><!-- ns__login::password -->
+  <part name="mode" type="xsd:string"/><!-- ns__login::mode -->
+</message>
+
+<message name="loginResponse">
+  <part name="resault" element="ns:resault"/><!-- ns__login::resault -->
+</message>
+
+<portType name="EchoPortType">
+  <operation name="echo">
+    <documentation>Service definition of function ns__echo</documentation>
+    <input message="tns:echoRequest"/>
+    <output message="tns:echoResponse"/>
+  </operation>
+  <operation name="login">
+    <documentation>Service definition of function ns__login</documentation>
+    <input message="tns:loginRequest"/>
+    <output message="tns:loginResponse"/>
+  </operation>
+</portType>
+
+<binding name="EchoPOST" type="tns:EchoPortType">
+  <HTTP:binding verb="POST"/>
+  <operation name="echo">
+    <HTTP:operation/>
+    <input>
+      <MIME:mimeXml part="echo"/>
+    </input>
+    <output>
+      <MIME:mimeXml part="resault"/>
+    </output>
+  </operation>
+  <operation name="login">
+    <HTTP:operation/>
+    <input>
+      <MIME:mimeXml part="login"/>
+    </input>
+    <output>
+      <MIME:mimeXml part="resault"/>
+    </output>
+  </operation>
+</binding>
+
+<service name="Echo">
+  <documentation>gSOAP 2.8.36 generated service definition</documentation>
+  <port name="EchoPOST" binding="tns:EchoPOST">
+    <HTTP:address location="http://localhost:80"/>
+  </port>
+</service>
+
+</definitions>
