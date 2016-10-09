@@ -102,3 +102,4 @@
 		然后我们就可以在main函数中启动这个线程了：
 		
 网页：http://wenku.baidu.com/link?url=HPo-hdoztobQn9YWD53185Cg5jXz7ckRxkeUxEvXJ44J4NFzVqlCMZCbaXw9mAxjCjuoZ_WhL79WfPWGaq4lPI9DC_cY_IYr68V2BTbJXOS
+	https://www.genivia.com/dev.html
