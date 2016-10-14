@@ -69,7 +69,7 @@ Unix linux windows
 3.构建过程
 编辑--->预编译--->编译---->汇编---->链接
 1)编辑 		vi hello.c
-2)预编译		gcc -E hello.c -o hello.i
+2)预编译	gcc -E hello.c -o hello.i
 3)编译		gcc -S hello.i
 4)汇编		gcc -c hello.s
 5)链接		gcc hello.o -o hello
@@ -113,7 +113,7 @@ makefile/make
 #pragma pack(1/2/4/8)
 //对结构体变量，按1/2/4/8字节对齐/补齐
 
-#pragma GCC dependency <文件>
+#123456<文件>
 //如果<文件>比当前文件新，产生警告
 
 #pragma GCC poison <标识>
