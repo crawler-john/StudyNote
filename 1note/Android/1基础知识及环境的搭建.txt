@@ -1,0 +1,57 @@
+1.Android系统架构
+	1.Linux内核层
+	2.系统运行库层
+		通过一些C/C++库来为Android系统提供主要的特性支持。
+	3.应用框架层
+		这一层主要提供了构建应用程序时可能用到的各种API，Android自带的一些核心应用就是使用这些API完成的，开发者也可以通过这些API来构建自己的应用程序。
+	4.应用层
+		
+2.Android开发特色
+	1.四大组件
+		Android系统四大组件分别是活动、服务、广播接收器和内容提供器。
+	2.丰富的系统控件
+	3.SQLite数据库
+	4.超强的多媒体
+	5.地理位置定位
+
+3.环境搭建
+	需要的工具：
+		1.JDK
+		2.Android SDK
+		3.Android Studio
+	
+4.分析第一个程序
+	1.项目结构
+		Android
+		Project
+		Packages
+		
+	2.分析project目录结构
+		1 .gradle和.idea	：这两个目录下放置的是AndroidStudio自动生成的一些文件，无需我们关心。
+		2 app	：项目中的代码、资源等内容几乎都放置在这个目录下，我们后面的开发工作也基本都是在这个目录下进行的。
+		3 build : 这个目录你也不需要过多的关心。
+		4 gradle ：这个目录下包含了gradle wrapper的配置文件，使用gradle wrapper的方式不需要提前奖gradle下载好，而是会自动根据本地的缓存清空界定是否需要联网下载gradle。
+		5 .gitignore ：这个温江是用来奖指定的目录或文件排除在版本控制之外。
+		6 build.gradle :这是项目全局的gradle构建脚本，通常这个文件中的内容是不需要修改的。
+		7 gradle.properties ：这个文件是全局的gradle配置文件，在这里配置的属性将会影响到项目中所有的gradle编译脚本。
+		8 gradlew和gradlew.bat ： 这两个文件是用来在命令行中执行gradle命令的，其中gradlew是在Linux或Mac系统中使用的，gradlew.bat是在Windows系统中使用的。
+		9 helloworld.iml ： iml文件是所有IntelliJ IDEA项目都会生成的一个文件，用于表示这是一个IntelliJ IDEA项目，我们不需要修改这个文件中的任何内容。
+		10 local.properties ： 这个文件用于指定本机中的Android SDK路径，通常内容是自动生成的，我们不需要修改。
+		11 settings.gradle ：这个文件用于指定项目中所有引入的模块。
+		
+	3.App目录下内容
+		1.build :这个目录和外层的build目录类似，主要也是包含了一些在编译时自动生成的文件。
+		2.libs ：如果项目中使用到了第三方jar包，就需要把这些jar包放在该目录下，放在该目录下的jar包会被自动添加到构建路径里面去。
+		3.androidTest：此处用来编写Android Test测试用例的，可以对项目进行一些自动化测试。
+		4.java毫无疑问，java目录是放置我们所有Java代码的地方。展开该目录，你将看到我们刚才创建的HelloWorldActivity文件就在里面
+		5.res：这个目录下的内容就有点多了。简单点说，就是你在项目中使用到的所有图片、布局、字符串等资源都要存放在这个目录下。
+		6.AndroidManifest.xml：这是你整个Android项目的配置文件，你在程序中定义的所有四大组件都需要在这个文件里注册。
+		7.test：此处是用来编写Unit Test测试用例的，是对项目进行自动化测试的另一种方式
+		8..gitignore：这个文件用于将app模块内的指定的目录或文件排除在版本控制之外，作用和外层的.gitignore文件类似
+		9.app.xml：IntelliJ IDEA项目自动生成的文件。
+		10.build.gradle：这是app模块的gradle构建脚本。
+		11.proguard-rules.pro：这个文件用于指定项目代码的混淆规则，当代码开发完成后打成安装包文件，如果不希望代码被别人破解，通常会将代码进行混淆，从而让破解者难以的读懂。
+		
+	
+	
+		
